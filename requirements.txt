@@ -1,0 +1,7 @@
+Flask
+Flask-SQLAlchemy
+Flask-APScheduler
+pyTelegramBotAPI
+requests
+psycopg2-binary
+gunicorn

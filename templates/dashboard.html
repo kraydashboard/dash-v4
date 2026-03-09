@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Habit Tracker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #fafafa;
+            color: #1a1a1a;
+            overflow-x: hidden;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 5fr;
+            min-height: 100vh;
+            max-width: 1920px;
+            margin: 0 auto;
+        }
+
+        /* LEFT PANEL - Completed Tasks */
+        .left-panel {
+            background: #ffffff;
+            border-right: 1px solid #e0e0e0;
+            padding: 32px 20px;
+            display: flex;
+            flex-direction: column;
+            max-height: 100vh;
+        }
+
+        .task-log-header {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .task-log {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto;
+            flex: 1;
+            padding-right: 5px;
+        }
+
+        .task-bubble {
+            background: #f5f5f5;
+            padding: 12px 16px;
+            border-radius: 14px;
+            max-width: 85%;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+
+        .task-bubble.left {
+            align-self: flex-start;
+            background: #f5f5f5;
+        }
+
+        .task-bubble.right {
+            align-self: flex-end;
+            background: #e8e8e8;
+        }
+
+        .task-text {
+            margin-bottom: 6px;
+        }
+
+        .task-timestamp {
+            font-size: 11px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .task-input-section {
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .task-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 60px;
+            margin-bottom: 8px;
+        }
+
+        .task-input:focus {
+            outline: none;
+            border-color: #1a1a1a;
+        }
+
+        .add-task-btn {
+            width: 100%;
+            padding: 10px;
+            background: #1a1a1a;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .add-task-btn:hover {
+            background: #333;
+        }
+
+        .add-task-btn:active {
+            background: #000;
+        }
+
+        /* RIGHT PANEL - Habit Tracker */
+        .right-panel {
+            background: #ffffff;
+            padding: 24px 32px;
+            overflow-y: auto;
+            max-height: 100vh;
+        }
+
+        .tracker-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .tracker-title {
+            font-size: 28px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+        }
+
+        .control-btn {
+            padding: 8px 16px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .control-btn:hover {
+            background: #e8e8e8;
+        }
+
+        .control-btn.danger {
+            color: #d32f2f;
+        }
+
+        .control-btn.danger:hover {
+            background: #ffebee;
+            border-color: #d32f2f;
+        }
+
+        /* GRID DYNAMICS */
+        .grid-container {
+            display: grid;
+            row-gap: 0px;
+            column-gap: 2px;
+            font-size: 11px;
+            padding-bottom: 50px;
+            align-items: center;
+        }
+
+        .week-header {
+            grid-row: 1;
+            text-align: center;
+            font-weight: 600;
+            padding: 8px 0;
+            font-size: 13px;
+        }
+
+        .day-number {
+            grid-row: 2;
+            text-align: center;
+            font-size: 10px;
+            color: #666;
+            padding: 4px 0 8px 0;
+        }
+
+        .category-header {
+            grid-column: 1 / -1;
+            font-weight: 700;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 12px 0 6px 0;
+            margin-top: 4px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .cat-add-btn { 
+            display: {{ 'inline-block' if is_auth else 'none' }} !important; 
+            cursor: pointer; 
+            font-size: 13px; 
+            font-weight: 600; 
+            color: #1a1a1a;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            padding: 4px 10px;
+            border-radius: 6px;
+            transition: all 0.2s;
+            
+            position: sticky;
+            right: 0px; 
+            z-index: 10;
+        }
+
+        .cat-add-btn:hover {
+            background: #e8e8e8;
+        }
+        
+
+        .habit-label {
+            grid-column: 1;
+            padding: 0px 12px 0px 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+            min-height: 16px;
+        }
+.label-controls { 
+   display: {{ 'flex' if is_auth else 'none' }} !important; 
+    gap: 4px; 
+    flex-shrink: 0;
+}
+
+        .l-btn { background: none; border: none; font-size: 10px; cursor: pointer; color: #999; }
+        .l-btn:hover { color: #1a1a1a; }
+        .l-btn.red:hover { color: #d32f2f; }
+
+        .habit-cell {
+            width: 14px;
+            height: 14px;
+            border: 1px solid #1a1a1a;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .habit-cell:hover {
+            transform: scale(1.1);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            z-index: 5;
+        }
+
+        .habit-cell.completed { background: #1a1a1a; }
+        
+.habit-cell.miss { 
+    background: repeating-linear-gradient(
+        45deg,
+        #1a1a1a,
+        #1a1a1a 2px,
+        #ffffff 2px,
+        #ffffff 4px
+    );
+    border-color: #1a1a1a;
+    opacity: 0.8;
+}
+        .habit-cell.is-today { border: 2px solid #2196f3 !important; transform: scale(1.1); }
+        .habit-cell.padding { border: none; pointer-events: none; opacity: 0; }
+        .habit-cell.fulfilled { background: #f0f0f0; border: 1px solid #ddd; }
+        .habit-cell.off-routine { border: 1px dashed #999; opacity: 0.5; }
+
+        .habit-cell[data-reason]:hover::after {
+            content: attr(data-reason);
+            position: absolute; bottom: 130%; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.85); color: #fff; padding: 4px 8px; border-radius: 4px;
+            font-size: 11px; white-space: nowrap; z-index: 999; pointer-events: none;
+        }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #c0c0c0; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a0a0a0; }
+
+        .modal {
+            display: none;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;
+        }
+
+        .modal.active { display: flex; }
+
+        .modal-content {
+            background: white; padding: 32px; border-radius: 12px; max-width: 400px; text-align: center;
+        }
+
+        .modal-title { font-size: 20px; font-weight: 600; margin-bottom: 12px; }
+        .modal-text { font-size: 14px; color: #666; margin-bottom: 24px; line-height: 1.5; }
+
+        .modal-buttons { display: flex; gap: 12px; justify-content: center; }
+
+        .modal-btn {
+            padding: 10px 24px; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s;
+        }
+        .modal-btn.cancel { background: #f5f5f5; color: #1a1a1a; }
+        .modal-btn.cancel:hover { background: #e8e8e8; }
+        .modal-btn.confirm { background: #d32f2f; color: white; }
+        .modal-btn.confirm:hover { background: #b71c1c; }
+        .modal-btn.black { background: #1a1a1a; color: white; }
+        .modal-btn.black:hover { background: #333; }
+        
+        .m-input {
+            width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #ddd; border-radius: 6px; font-family: inherit; font-size: 13px;
+        }
+        .m-label { display: block; text-align: left; font-size: 12px; color: #666; margin-bottom: 4px; font-weight: 600; }
+    </style>
+
+    <script>
+
+        const IS_AUTH = ("{{ is_auth }}" === "True" || "{{ is_auth }}" === "true");
+
+        function submitAuth() {
+            const pwd = document.getElementById('authPassword').value;
+            fetch('/api/login', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ password: pwd })
+            }).then(r => r.json()).then(d => {
+                if(d.success) location.reload();
+                else document.getElementById('loginError').style.display = 'block';
+            });
+        }
+
+        function logoutAuth() {
+            fetch('/api/logout', {method: 'POST'}).then(() => location.reload());
+        }
+        // Backend JS Functions
+        function showModalWindow(id) { document.getElementById(id).classList.add('active'); }
+        function hideModalWindow(id) { document.getElementById(id).classList.remove('active'); }
+
+        function deleteThread(id, name) {
+            if(confirm("Archive: " + name + "?")) {
+                fetch('/api/delete_thread', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ id: id }) }).then(() => location.reload());
+            }
+        }
+        function moveThread(id, direction) {
+            fetch('/api/move_thread', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ id: id, direction: direction }) }).then(() => location.reload());
+        }
+        
+        let currentCat = '';
+        function openAddModal(cat) {
+            currentCat = cat;
+            document.getElementById('catNameDisplay').innerText = cat;
+            showModalWindow('addThreadModal');
+        }
+        
+        function submitNewThread() {
+            const payload = {
+                name: document.getElementById('newThreadName').value,
+                category: currentCat,
+                redacted: document.getElementById('newThreadRedacted').value,
+                sub_category: document.getElementById('newThreadSubCat').value,
+                type: document.getElementById('newThreadType').value,
+                cadence: document.getElementById('newThreadCadence').value
+            };
+            fetch('/api/add_thread', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) }).then(r => r.json()).then(d => { if(d.success) location.reload(); else alert(d.error); });
+        }
+
+        function openEditModal(id, name, redacted, subCat, type, cadence) {
+            document.getElementById('editThreadId').value = id;
+            document.getElementById('editThreadName').value = name || '';
+            document.getElementById('editThreadRedacted').value = redacted || '';
+            document.getElementById('editThreadSubCat').value = subCat || '';
+            document.getElementById('editThreadType').value = type || 'perpetual';
+            document.getElementById('editThreadCadence').value = cadence || 'daily';
+            
+            showModalWindow('editThreadModal');
+        }
+
+        function submitEditThread() {
+            const payload = {
+                id: document.getElementById('editThreadId').value,
+                name: document.getElementById('editThreadName').value,
+                redacted: document.getElementById('editThreadRedacted').value,
+                sub_category: document.getElementById('editThreadSubCat').value,
+                type: document.getElementById('editThreadType').value,
+                cadence: document.getElementById('editThreadCadence').value
+            };
+            
+            fetch('/api/edit_thread', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify(payload) 
+            })
+            .then(r => r.json())
+            .then(d => { 
+                if(d.success) location.reload(); 
+                else alert(d.error); 
+            });
+        }
+        
+        function saveContext() {
+            const payload = {
+                top_work: document.getElementById('ctxWork').value,
+                top_other: document.getElementById('ctxOther').value,
+                project: document.getElementById('ctxProject').value,
+                meds: document.getElementById('ctxMeds').checked,
+                off_routine: document.getElementById('ctxOff').checked,
+                off_reason: document.getElementById('ctxOffReason').value
+            };
+            fetch('/api/update_day_context', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+            }).then(() => location.reload()); 
+        }
+
+        let activeCell = null;
+        function handleCellClick(el) {
+            if (!IS_AUTH) { showModalWindow('loginModal'); return; }
+            const status = el.getAttribute('data-status');
+            const next = (status === 'empty') ? 'hit' : (status === 'hit' ? 'miss' : 'empty');
+            if (next === 'miss') {
+                activeCell = el;
+                document.getElementById('missReason').value = "";
+                showModalWindow('missModal');
+                document.getElementById('missReason').focus();
+            } else { updateSquare(el, next, ""); }
+        }
+        
+        function submitMiss() {
+            if(activeCell) { 
+                const reason = document.getElementById('missReason').value;
+                updateSquare(activeCell, 'miss', reason); 
+                hideModalWindow('missModal'); 
+            }
+        }
+        
+function updateSquare(el, status, reason) {
+            el.setAttribute('data-status', status);
+            if (status === 'miss' && reason) { el.setAttribute('data-reason', reason); } 
+            else { el.removeAttribute('data-reason'); }
+
+            let newClass = 'habit-cell ';
+            if (status === 'hit') newClass += 'completed ';
+            if (status === 'miss') newClass += 'miss ';
+            if (el.classList.contains('is-today')) newClass += 'is-today ';
+            if (el.classList.contains('off-routine')) newClass += 'off-routine ';
+            
+            el.className = newClass;
+            
+            updateRowVisuals(el.getAttribute('data-id'), el.getAttribute('data-week'), el.getAttribute('data-cadence'));
+            
+            fetch('/api/toggle_status', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ thread_id: el.getAttribute('data-id'), date: el.getAttribute('data-date'), status: status, miss_reason: reason })
+            });
+        }
+
+        function updateRowVisuals(threadId, weekIndex, cadence) {
+            let target = 0;
+            if (cadence === 'weekly') target = 1;
+            if (cadence === '3x_week') target = 3;
+            
+            if (target > 0) {
+                const cells = document.querySelectorAll(`.habit-cell[data-id="${threadId}"][data-week="${weekIndex}"]`);
+                let hits = 0;
+                cells.forEach(c => { if(c.getAttribute('data-status') === 'hit') hits++; });
+                
+                cells.forEach(c => {
+                    const status = c.getAttribute('data-status');
+                    if (status !== 'hit' && status !== 'miss') {
+                        if (hits >= target) c.classList.add('fulfilled');
+                        else c.classList.remove('fulfilled');
+                    } else {
+                        c.classList.remove('fulfilled');
+                    }
+                });
+            }
+        }
+
+        function handleRightClick(e, el) {
+            e.preventDefault(); 
+            if (!IS_AUTH) { showModalWindow('loginModal'); return; }
+            const dateStr = el.getAttribute('data-date');
+            
+            fetch('/api/get_day_info', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ date: dateStr })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if(data.success) {
+                    document.getElementById('ctxWork').value = data.work;
+                    document.getElementById('ctxOther').value = data.other;
+                    document.getElementById('ctxProject').value = data.project;
+                    document.getElementById('ctxMeds').checked = data.meds;
+                    document.getElementById('ctxOff').checked = data.off;
+                    document.getElementById('ctxOffReason').value = data.off_reason;
+                    document.getElementById('ctxOffReason').style.display = data.off ? 'block' : 'none';
+                    document.getElementById('ctxComments').value = data.comments || "Немає записів за цей день.";
+                    document.getElementById('contextTitle').innerText = "Day Context: " + dateStr;
+                    showModalWindow('contextModal');
+                }
+            });
+        }
+
+        function addTaskAPI() {
+            const input = document.getElementById('taskInput');
+            const text = input.value.trim();
+            if (!text) return;
+            fetch('/api/update_day_context', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ comments: text })
+            }).then(() => location.reload());
+        }
+
+        function exportData() { alert("Please use the /backup command in the Telegram Bot to export your database."); }
+        function importData() { alert("Please send the JSON file to the Telegram Bot to restore."); }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            const taskInput = document.getElementById('taskInput');
+            if (taskInput) {
+                taskInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        addTaskAPI();
+                    }
+                });
+            }
+        });
+    </script>
+</head>
+<body>
+    <div class="container">
+        <div class="left-panel">
+            <div class="task-log-header">Completed Tasks</div>
+            <div class="task-log" id="taskLog">
+                {% if ctx.comment_list %}
+                    {% for msg in ctx.comment_list %}
+                        <div class="task-bubble {% if loop.index % 2 == 0 %}right{% else %}left{% endif %}">
+                            <div class="task-text">{{ msg.text }}</div>
+                            <div class="task-timestamp">{{ msg.date }} · {{ msg.time if msg.time else "--:--" }}</div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div style="color:#999; text-align:center; margin-top:50px; font-size: 13px;">No tasks yet.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="right-panel">
+            <div class="tracker-header">
+                <h1 class="tracker-title">Habit Tracker</h1>
+                <div class="controls">
+                    {% if is_auth %}
+                        <button class="control-btn" onclick="showModalWindow('contextModal')">Day Context</button>
+                        <button class="control-btn" onclick="exportData()">Export Data</button>
+                        <button class="control-btn danger" onclick="showModalWindow('resetModal')">Reset All</button>
+                        <button class="control-btn" onclick="logoutAuth()">Lock</button>
+                    {% else %}
+                        <button class="control-btn" onclick="showModalWindow('loginModal')">Unlock Edit Mode</button>
+                    {% endif %}
+                </div>
+            </div>
+            
+            {% set first_cat = categories[0] %}
+            {% if grouped_threads[first_cat] and grouped_threads[first_cat][0] %}
+                {% set total_days = grouped_threads[first_cat][0].weeks | length * 7 %}
+            {% else %}
+                {% set total_days = 365 %}
+            {% endif %}
+
+            <div class="grid-container" style="grid-template-columns: max-content repeat({{ total_days }}, 14px);">
+                
+                {% if week_headers %}
+                    {% for header in week_headers %}
+                        <div class="week-header" style="grid-column: {{ 2 + loop.index0 * 7 }} / span 7;">{{ header }}</div>
+                    {% endfor %}
+                    
+                    {% set header_col = namespace(value=2) %}
+                    {% for _ in week_headers %}
+                        {% for i in range(1, 8) %}
+                            <div class="day-number" style="grid-column: {{ header_col.value }};">{{ i }}</div>
+                            {% set header_col.value = header_col.value + 1 %}
+                        {% endfor %}
+                    {% endfor %}
+                {% endif %}
+
+                {% for cat in categories %}
+                    <div class="category-header">
+                        <span>{{ cat|title }}</span>
+                        {% if is_auth %}
+                            <span class="cat-add-btn" onclick="openAddModal('{{ cat }}')" style="display: inline-block !important;">+ Add</span>
+                        {% endif %}
+                    </div>
+                    
+                    {% for item in grouped_threads[cat] %}
+                        <div class="habit-label">
+                            <span style="white-space: nowrap; padding-right: 15px;">{{ item.info.thread_name }}</span>
+                            
+                            {% if is_auth %}
+                            <div class="label-controls" style="display: flex !important;">
+    <button class="l-btn" onclick="openEditModal('{{ item.info.thread_id }}', '{{ item.info.thread_name }}', '{{ item.info.thread_name_redacted or '' }}', '{{ item.info.sub_category or '' }}', '{{ item.info.type }}', '{{ item.info.cadence }}')">✎</button>
+    <button class="l-btn" onclick="moveThread('{{ item.info.thread_id }}', 'up')">↑</button>
+    <button class="l-btn" onclick="moveThread('{{ item.info.thread_id }}', 'down')">↓</button>
+    <button class="l-btn red" onclick="deleteThread('{{ item.info.thread_id }}', '{{ item.info.thread_name }}')">×</button>
+</div>
+                            {% endif %}
+                        </div>
+                        
+                        {% set col_counter = namespace(value=2) %}
+                        {% for week in item.weeks %}
+                            {% set w_index = loop.index0 %}
+                            {% for day in week %}
+                                {% if day.is_padding %}
+                                    <div class="habit-cell padding" style="grid-column: {{ col_counter.value }};"></div>
+                                {% else %}
+                                    <div class="habit-cell {% if day.status == 'hit' %}completed{% elif day.status == 'miss' %}miss{% endif %} {% if day.is_today %}is-today{% endif %} {% if day.is_off_routine %}off-routine{% endif %} {% if day.is_fulfilled %}fulfilled{% endif %}"
+                                         style="grid-column: {{ col_counter.value }};"
+                                         data-id="{{ item.info.thread_id }}"
+                                         data-date="{{ day.date }}"
+                                         data-status="{{ day.status }}"
+                                         data-week="{{ w_index }}"          data-cadence="{{ item.info.cadence }}" {% if day.miss_reason %}data-reason="{{ day.miss_reason }}"{% endif %}
+                                         onclick="handleCellClick(this)"
+                                         oncontextmenu="handleRightClick(event, this)">
+                                    </div>
+                                {% endif %}
+                                {% set col_counter.value = col_counter.value + 1 %}
+                            {% endfor %}
+                        {% endfor %}
+                    {% endfor %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="resetModal">
+        <div class="modal-content">
+            <div class="modal-title">Reset All Data?</div>
+            <div class="modal-text">This will clear all habit tracking data. Please use the Telegram Bot database commands for full reset.</div>
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" onclick="hideModalWindow('resetModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="addThreadModal">
+        <div class="modal-content">
+            <div class="modal-title">New Habit: <span id="catNameDisplay" style="color:#999; font-weight:normal;"></span></div>
+            <div style="text-align: left; margin-bottom: 20px;">
+                <label class="m-label">Name</label><input type="text" id="newThreadName" class="m-input">
+                <label class="m-label">Hidden Name</label><input type="text" id="newThreadRedacted" class="m-input">
+                <label class="m-label">Sub Category</label><input type="text" id="newThreadSubCat" class="m-input">
+                <label class="m-label">Type</label>
+                <select id="newThreadType" class="m-input"><option value="perpetual">Perpetual</option><option value="quest">Quest</option><option value="frog">Frog</option></select>
+                <label class="m-label">Frequency</label>
+                <select id="newThreadCadence" class="m-input">
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="3x_week">3x / Week</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Seasonally</option>
+                    <option value="yearly">Yearly</option>
+                </select>
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" onclick="hideModalWindow('addThreadModal')">Cancel</button>
+                <button class="modal-btn black" onclick="submitNewThread()">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="editThreadModal">
+        <div class="modal-content">
+            <div class="modal-title">Edit Habit</div>
+            <div style="text-align: left; margin-bottom: 20px;">
+                <input type="hidden" id="editThreadId">
+                <label class="m-label">Name</label>
+                <input type="text" id="editThreadName" class="m-input">
+                
+                <label class="m-label">Hidden Name</label>
+                <input type="text" id="editThreadRedacted" class="m-input">
+                
+                <label class="m-label">Sub Category</label>
+                <input type="text" id="editThreadSubCat" class="m-input">
+                
+                <label class="m-label">Type</label>
+                <select id="editThreadType" class="m-input">
+                    <option value="perpetual">Perpetual</option>
+                    <option value="quest">Quest</option>
+                    <option value="frog">Frog</option>
+                </select>
+                
+                <label class="m-label">Frequency</label>
+                <select id="editThreadCadence" class="m-input">
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="3x_week">3x / Week</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Seasonally</option>
+                    <option value="yearly">Yearly</option>
+                </select>
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" onclick="hideModalWindow('editThreadModal')">Cancel</button>
+                <button class="modal-btn black" onclick="submitEditThread()">Save</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal" id="contextModal">
+        <div class="modal-content">
+            <div class="modal-title" id="contextTitle">Day Context</div>
+            <div style="text-align: left; margin-bottom: 20px;">
+                <label class="m-label">Work Priority</label><input type="text" id="ctxWork" value="{{ ctx.top_work }}" class="m-input">
+                <label class="m-label">Self Priority</label><input type="text" id="ctxOther" value="{{ ctx.top_other }}" class="m-input">
+                <label class="m-label">Project</label><input type="text" id="ctxProject" value="{{ ctx.project }}" class="m-input">
+                <label class="m-label">Твіти (Day Log)</label>
+                <textarea id="ctxComments" class="m-input" readonly style="background: #f5f5f5; min-height: 60px; font-family: monospace; font-size: 11px; resize: vertical;" placeholder="Записів немає..."></textarea>
+                <div style="margin-top: 15px;">
+                    <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:500;">
+                        <input type="checkbox" id="ctxMeds" {% if ctx.meds %}checked{% endif %}> Meds Taken
+                    </label>
+                </div>
+                
+                <div style="margin-top: 15px; padding: 12px; background: #fff5f5; border: 1px solid #ffebee; border-radius: 6px;">
+                    <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color: #d32f2f;">
+                        <input type="checkbox" id="ctxOff" onchange="document.getElementById('ctxOffReason').style.display = this.checked ? 'block' : 'none';" {% if ctx.off_routine %}checked{% endif %}> OFF ROUTINE
+                    </label>
+                    <input type="text" id="ctxOffReason" value="{{ ctx.off_reason }}" class="m-input" style="display:{% if ctx.off_routine %}block{% else %}none{% endif %}; margin-top:8px; margin-bottom:0;" placeholder="Reason (Sick/Holiday)...">
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" onclick="hideModalWindow('contextModal')">Close</button>
+                <button class="modal-btn black" onclick="saveContext()">Save All</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="missModal">
+        <div class="modal-content" style="max-width: 320px;">
+            <div class="modal-title">Reason for Skip</div>
+            <input type="text" id="missReason" class="m-input" placeholder="Optional context..." style="margin-bottom: 20px;">
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" onclick="hideModalWindow('missModal')">Cancel</button>
+                <button class="modal-btn black" onclick="submitMiss()">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="loginModal">
+        <div class="modal-content" style="max-width: 300px;">
+            <div class="modal-title">Terminal Access</div>
+            <input type="password" id="authPassword" class="m-input" placeholder="Enter Password" onkeypress="if(event.key === 'Enter') submitAuth();">
+            <div id="loginError" style="color: #d32f2f; font-size: 12px; margin-bottom: 12px; display: none;">Access Denied. Wrong password.</div>
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" onclick="hideModalWindow('loginModal')">Cancel</button>
+                <button class="modal-btn black" onclick="submitAuth()">Unlock</button>
+            </div>
+        </div>
+    </div>
+    
+</body>
+</html>
