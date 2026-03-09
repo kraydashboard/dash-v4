@@ -16,7 +16,6 @@ from flask import Flask, render_template, request, jsonify, send_file, session
 app = Flask(__name__)
 # --- CONFIG ---
 app.secret_key = os.environ.get("SECRET_KEY", "sdfeergrthbwefsDSlvsrgpsesvaflsvkvl")
-TG_BOT_TOKEN = os.environ.get("TG_BOT_TOKEN", "YOUR_LOCAL_TOKEN")
 REQUEST_BOT_TOKEN = os.environ.get("REQUEST_BOT_TOKEN", "") # Токен для нового бота
 HASH_USER = os.environ.get("HASH_USER", "a080f87fefbcc9ddfe34650dd5c20659b852fd8cdd8e269a2bc5c3f4ad7cd7cf")
 HASH_ADMIN = os.environ.get("HASH_ADMIN", "a5a915b49d0188897ddbdcaf47868a28af8d06851f3430bbe43e49660f05760a")
@@ -45,10 +44,6 @@ app.config.from_object(Config())
 
 db = SQLAlchemy(app)
 scheduler = APScheduler()
-
-bot = None
-if TG_BOT_TOKEN and "YOUR_LOCAL" not in TG_BOT_TOKEN:
-    bot = telebot.TeleBot(TG_BOT_TOKEN)
 
 request_bot = None
 if REQUEST_BOT_TOKEN:
@@ -334,115 +329,24 @@ def send_scheduled_backup():
             timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')
             filename = f"backup_{timestamp}.json"
             
-            for admin in admins:
-                bot.send_document(admin.chat_id, backup_content.encode('utf-8'), visible_file_name=filename, caption=f"📦 Full Backup (JSON)")
-    except Exception as e:
-        print(f"Backup failed: {e}")
+for admin in admins:
+                if request_bot:
+                    request_bot.send_document(admin.chat_id, backup_content.encode('utf-8'), visible_file_name=filename, caption=f"📦 Full Backup (JSON)")
+    
+# --- REQUEST BOT LOGIC ---
+if request_bot:
+    @request_bot.message_handler(commands=['start', 'help'])
+    def req_send_welcome(message):
+        request_bot.reply_to(message, "Hello! Write your requests here. \n\nTo get all requests as a list, type /list\nTo clear the list, type /clear\n\n(Enter password for Admin Mode)")
 
-# --- BOT ---
-if bot:
-    @bot.message_handler(commands=['start'])
-    def send_welcome(message):
-        bot.reply_to(message, "Enter your password:")
-
-    @bot.message_handler(commands=['logout'])
+    @request_bot.message_handler(commands=['logout'])
     def handle_logout(message):
         with app.app_context():
             user = db.session.get(BotUser, message.chat.id)
             if user:
                 db.session.delete(user)
                 db.session.commit()
-                bot.reply_to(message, "ok")
-
-    @bot.message_handler(content_types=['document'])
-    def handle_docs(message):
-        with app.app_context():
-            user = db.session.get(BotUser, message.chat.id)
-            if not user or user.role != "admin": return
-            
-        try:
-            file_name = message.document.file_name
-            if not file_name.endswith('.json'):
-                bot.reply_to(message, "❌ I need .json file")
-                return
-            file_info = bot.get_file(message.document.file_id)
-            downloaded_file = bot.download_file(file_info.file_path)
-            json_content = downloaded_file.decode('utf-8')
-            bot.reply_to(message, "⏳ restoring...")
-            with app.app_context():
-                success, msg = restore_from_json(json_content)
-            if success:
-                bot.reply_to(message, "✅ Success.")
-            else:
-                bot.reply_to(message, f"❌ Error: {msg}")
-        except Exception as e:
-            bot.reply_to(message, f"Error: {e}")
-
-    @bot.message_handler(func=lambda message: True)
-    def handle_all_messages(message):
-        chat_id = message.chat.id
-        txt = message.text.strip()
-        
-        with app.app_context():
-            user = db.session.get(BotUser, chat_id)
-            
-            if not user:
-                pwd_hash = hashlib.sha256(txt.encode()).hexdigest()
-                if pwd_hash == HASH_USER:
-                    db.session.add(BotUser(chat_id=chat_id, role="user"))
-                    db.session.commit()
-                    bot.reply_to(message, "✅ User Mode.")
-                elif pwd_hash == HASH_ADMIN:
-                    db.session.add(BotUser(chat_id=chat_id, role="admin"))
-                    db.session.commit()
-                    bot.reply_to(message, "👨‍💻 Admin Mode.")
-                else: 
-                    bot.reply_to(message, "❌ wrong password.")
-                return
-            
-            user_role = user.role
-
-            if user_role == "user":
-                if txt.startswith('/del'):
-                    parts = txt.split()
-                    if len(parts) > 1 and parts[1].isdigit():
-                        item = db.session.get(BoardItem, int(parts[1]))
-                        if item:
-                            db.session.delete(item)
-                            db.session.commit()
-                            bot.reply_to(message, "🗑 ok.")
-                elif txt == "/list":
-                    items = BoardItem.query.order_by(BoardItem.id.desc()).all()
-                    msg = "\n".join([f"{item.id}. {item.text}" for item in items]) if items else "Empty."
-                    bot.reply_to(message, msg)
-                elif txt.startswith("/b "):
-                    note = txt[3:].strip()
-                    db.session.add(BoardItem(text=note))
-                    db.session.commit()
-                    bot.reply_to(message, "📌 added.")
-                else:
-                    try:
-                        cal = ensure_calendar_entry(date.today())
-                        timestamp = datetime.datetime.now().strftime("%H:%M")
-                        entry = f"[{timestamp}] {txt}"
-                        if cal.comments: cal.comments += "\n" + entry
-                        else: cal.comments = entry
-                        db.session.commit()
-                        bot.reply_to(message, "🐦 saved.")
-                    except Exception as e:
-                        bot.reply_to(message, f"DB Error: {e}")
-                    
-            elif user_role == "admin":
-                if txt == "/backup":
-                    send_scheduled_backup()
-                else:
-                    bot.reply_to(message, "bro, where is json")
-                    
-# --- REQUEST BOT LOGIC ---
-if request_bot:
-    @request_bot.message_handler(commands=['start', 'help'])
-    def req_send_welcome(message):
-        request_bot.reply_to(message, "Hello! Write your requests here. \n\nTo get all requests as a list, type /list\nTo clear the list, type /clear")
+                request_bot.reply_to(message, "ok")
 
     @request_bot.message_handler(commands=['list'])
     def req_list_requests(message):
@@ -465,13 +369,59 @@ if request_bot:
             db.session.commit()
             request_bot.reply_to(message, "🗑 The list has been successfully cleared.")
 
-    @request_bot.message_handler(func=lambda message: True)
-    def req_add_request(message):
-        txt = message.text.strip()
+    @request_bot.message_handler(commands=['backup'])
+    def handle_backup(message):
         with app.app_context():
+            user = db.session.get(BotUser, message.chat.id)
+            if user and user.role == "admin":
+                send_scheduled_backup()
+            else:
+                request_bot.reply_to(message, "bro, where is json")
+
+    @request_bot.message_handler(content_types=['document'])
+    def handle_docs(message):
+        with app.app_context():
+            user = db.session.get(BotUser, message.chat.id)
+            if not user or user.role != "admin": return
+            
+        try:
+            file_name = message.document.file_name
+            if not file_name.endswith('.json'):
+                request_bot.reply_to(message, "❌ I need .json file")
+                return
+            file_info = request_bot.get_file(message.document.file_id)
+            downloaded_file = request_bot.download_file(file_info.file_path)
+            json_content = downloaded_file.decode('utf-8')
+            request_bot.reply_to(message, "⏳ restoring...")
+            with app.app_context():
+                success, msg = restore_from_json(json_content)
+            if success:
+                request_bot.reply_to(message, "✅ Success.")
+            else:
+                request_bot.reply_to(message, f"❌ Error: {msg}")
+        except Exception as e:
+            request_bot.reply_to(message, f"Error: {e}")
+
+    @request_bot.message_handler(func=lambda message: True)
+    def handle_all_text(message):
+        chat_id = message.chat.id
+        txt = message.text.strip()
+        
+        with app.app_context():
+            # 1. Перевірка на адмінський пароль
+            pwd_hash = hashlib.sha256(txt.encode()).hexdigest()
+            if pwd_hash == HASH_ADMIN:
+                user = db.session.get(BotUser, chat_id)
+                if not user:
+                    db.session.add(BotUser(chat_id=chat_id, role="admin"))
+                    db.session.commit()
+                request_bot.reply_to(message, "👨‍💻 Admin Mode.")
+                return
+
             new_req = PartnerRequest(text=txt)
             db.session.add(new_req)
             db.session.commit()
+            
         request_bot.reply_to(message, "✅ Added to the list!")
 
 def run_bot_thread():
@@ -742,10 +692,13 @@ with app.app_context():
     if not scheduler.get_job('auto_backup'):
         scheduler.add_job(id='auto_backup', func=send_scheduled_backup, trigger='cron', hour=23, minute=59)
 
-if not any(t.name == "BotThread" for t in threading.enumerate()):
-    t = threading.Thread(target=run_bot_thread, name="BotThread")
-    t.daemon = True
-    t.start()
+def run_request_bot_thread():
+    if request_bot:
+        try:
+            print("Request Bot polling started...")
+            request_bot.polling(none_stop=True)
+        except Exception as e:
+            print(f"Request Bot crash: {e}")
 
 if not any(t.name == "RequestBotThread" for t in threading.enumerate()):
     t2 = threading.Thread(target=run_request_bot_thread, name="RequestBotThread")
