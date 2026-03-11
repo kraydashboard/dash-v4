@@ -195,9 +195,10 @@ body.edit-mode .label-controls { display: flex !important; }
     margin-top: 16px;
     overflow-x: auto;
 }
-        
+
 .grid-container {
     display: grid;
+    /*grid-template-columns: max-content repeat(52, 14px 14px 14px 14px 14px 14px 14px 3px);*/
     column-gap: 2px;
     row-gap: 0;
     justify-content: start;
@@ -493,6 +494,12 @@ body.edit-mode .label-controls { display: flex !important; }
             });
         }
         
+        function openContextModalFromHeader() {
+            activeCell = null;
+            document.getElementById('ctxSquareNoteWrapper').style.display = 'none';
+            showModalWindow('contextModal');
+        }
+
         function saveContext() {
             const payload = {
                 top_work: document.getElementById('ctxWork').value,
@@ -502,31 +509,52 @@ body.edit-mode .label-controls { display: flex !important; }
                 off_routine: document.getElementById('ctxOff').checked,
                 off_reason: document.getElementById('ctxOffReason').value
             };
+            
+            if (activeCell) {
+                const newNote = document.getElementById('ctxSquareNote').value;
+                const currentStatus = activeCell.getAttribute('data-status');
+                updateSquare(activeCell, currentStatus, newNote);
+            }
+
             fetch('/api/update_day_context', {
                 method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
             }).then(() => location.reload()); 
+        }
+
+        function updateSquare(el, status, reason) {
+            el.setAttribute('data-status', status);
+            if (reason && reason.trim() !== "") { 
+                el.setAttribute('data-reason', reason); 
+            } else { 
+                el.removeAttribute('data-reason'); 
+            }
+
+            let newClass = 'habit-cell ';
+            if (status === 'hit') newClass += 'completed ';
+            if (el.classList.contains('is-today')) newClass += 'is-today ';
+            if (el.classList.contains('off-routine')) newClass += 'off-routine ';
+            if (el.classList.contains('past-week')) newClass += 'past-week ';
+            
+            el.className = newClass;
+            
+            updateRowVisuals(el.getAttribute('data-id'), el.getAttribute('data-week'), el.getAttribute('data-cadence'));
+            
+            fetch('/api/toggle_status', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ thread_id: el.getAttribute('data-id'), date: el.getAttribute('data-date'), status: status, miss_reason: reason })
+            });
         }
 
         let activeCell = null;
         function handleCellClick(el) {
             if (!IS_AUTH) { showModalWindow('loginModal'); return; }
             const status = el.getAttribute('data-status');
-            const next = (status === 'empty') ? 'hit' : (status === 'hit' ? 'miss' : 'empty');
-            if (next === 'miss') {
-                activeCell = el;
-                document.getElementById('missReason').value = "";
-                showModalWindow('missModal');
-                document.getElementById('missReason').focus();
-            } else { updateSquare(el, next, ""); }
+            const next = (status === 'empty') ? 'hit' : 'empty';
+            
+            const currentNote = el.getAttribute('data-reason') || "";
+            updateSquare(el, next, currentNote);
         }
         
-        function submitMiss() {
-            if(activeCell) { 
-                const reason = document.getElementById('missReason').value;
-                updateSquare(activeCell, 'miss', reason); 
-                hideModalWindow('missModal'); 
-            }
-        }
         
 function updateSquare(el, status, reason) {
             el.setAttribute('data-status', status);
@@ -575,7 +603,12 @@ function updateSquare(el, status, reason) {
         function handleRightClick(e, el) {
             e.preventDefault(); 
             if (!IS_AUTH) { showModalWindow('loginModal'); return; }
+            activeCell = el;
             const dateStr = el.getAttribute('data-date');
+            
+            const currentNote = el.getAttribute('data-reason') || "";
+            document.getElementById('ctxSquareNote').value = currentNote;
+            document.getElementById('ctxSquareNoteWrapper').style.display = 'block';
             
             fetch('/api/get_day_info', {
                 method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ date: dateStr })
@@ -592,6 +625,7 @@ function updateSquare(el, status, reason) {
                     document.getElementById('ctxOffReason').style.display = data.off ? 'block' : 'none';
                     document.getElementById('ctxComments').value = data.comments || "Немає записів за цей день.";
                     document.getElementById('contextTitle').innerText = "Day Context: " + dateStr;
+                    
                     showModalWindow('contextModal');
                 }
             });
@@ -666,8 +700,7 @@ function updateSquare(el, status, reason) {
             <span class="edit-label">Edit: OFF</span>
         </div>
 
-        <button class="control-btn" onclick="showModalWindow('contextModal')">Day Context</button>
-        <button class="control-btn" onclick="exportData()">Export Data</button>
+        <button class="control-btn" onclick="openContextModalFromHeader()">Day Context</button>        <button class="control-btn" onclick="exportData()">Export Data</button>
         <button class="control-btn danger" onclick="showModalWindow('resetModal')">Reset All</button>
         <button class="control-btn" onclick="logoutAuth()">Lock</button>
     {% else %}
@@ -767,14 +800,16 @@ function updateSquare(el, status, reason) {
                     {% set d_idx = loop.index0 %}
                     {% set current_col = 2 + (w_idx * 8) + d_idx %}
                     
-                    <div class="habit-cell {% if day.status == 'hit' %}completed{% elif day.status == 'miss' %}miss{% endif %} {% if day.is_today %}is-today{% endif %} {% if not is_last_week %}past-week{% endif %}"
-                         style="grid-column: {{ current_col }};"
-                         data-id="{{ item.info.thread_id }}"
-                         data-date="{{ day.date }}"
-                         data-status="{{ day.status }}"
-                         onclick="handleCellClick(this)"
-                         oncontextmenu="handleRightClick(event, this)">
-                    </div>
+                    <div class="habit-cell {% if day.status == 'hit' %}completed{% endif %} {% if day.is_today %}is-today{% endif %} {% if not is_last_week %}past-week{% endif %}"
+     style="grid-column: {{ current_col }};"
+     data-id="{{ item.info.thread_id }}"
+     data-date="{{ day.date }}"
+     data-status="{{ day.status }}"
+     data-week="{{ w_idx }}"
+     {% if day.miss_reason %}data-reason="{{ day.miss_reason }}"{% endif %}
+     onclick="handleCellClick(this)"
+     oncontextmenu="handleRightClick(event, this)">
+</div>
                 {% endfor %}
             {% endfor %}
         {% endfor %}
@@ -858,8 +893,14 @@ function updateSquare(el, status, reason) {
     <div class="modal" id="contextModal">
         <div class="modal-content">
             <div class="modal-title" id="contextTitle">Day Context</div>
-            <div style="text-align: left; margin-bottom: 20px;">
-                <label class="m-label">Work Priority</label><input type="text" id="ctxWork" value="{{ ctx.top_work }}" class="m-input">
+<div style="text-align: left; margin-bottom: 20px;">
+    
+    <div id="ctxSquareNoteWrapper" style="display: none; padding-bottom: 12px; margin-bottom: 16px; border-bottom: 1px dashed #ddd;">
+        <label class="m-label" style="color: #2196f3;">Square Note</label>
+        <input type="text" id="ctxSquareNote" class="m-input" placeholder="Add note..." style="margin-bottom: 0;">
+    </div>
+
+    <label class="m-label">Work Priority</label><input type="text" id="ctxWork" value="{{ ctx.top_work }}" class="m-input">
                 <label class="m-label">Self Priority</label><input type="text" id="ctxOther" value="{{ ctx.top_other }}" class="m-input">
                 <label class="m-label">Project</label><input type="text" id="ctxProject" value="{{ ctx.project }}" class="m-input">
                 <label class="m-label">Твіти (Day Log)</label>
@@ -880,17 +921,6 @@ function updateSquare(el, status, reason) {
             <div class="modal-buttons">
                 <button class="modal-btn cancel" onclick="hideModalWindow('contextModal')">Close</button>
                 <button class="modal-btn black" onclick="saveContext()">Save All</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal" id="missModal">
-        <div class="modal-content" style="max-width: 320px;">
-            <div class="modal-title">Reason for Skip</div>
-            <input type="text" id="missReason" class="m-input" placeholder="Optional context..." style="margin-bottom: 20px;">
-            <div class="modal-buttons">
-                <button class="modal-btn cancel" onclick="hideModalWindow('missModal')">Cancel</button>
-                <button class="modal-btn black" onclick="submitMiss()">Confirm</button>
             </div>
         </div>
     </div>
