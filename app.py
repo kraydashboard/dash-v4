@@ -404,7 +404,6 @@ if request_bot:
         txt = message.text.strip()
         
         with app.app_context():
-            # 1. Перевірка на адмінський пароль
             pwd_hash = hashlib.sha256(txt.encode()).hexdigest()
             if pwd_hash == HASH_ADMIN:
                 user = db.session.get(BotUser, chat_id)
