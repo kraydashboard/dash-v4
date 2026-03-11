@@ -595,7 +595,7 @@ def toggle_status():
         sq = Square(square_id=sq_id, thread_id=t_id, period=d_date)
         db.session.add(sq)
     sq.status = data.get('status')
-    sq.chain_end_reason = data.get('miss_reason', '') if sq.status == 'miss' else ""
+    sq.chain_end_reason = data.get('miss_reason', '')
     db.session.commit()
     recalculate_chains(t_id)
     return jsonify({'success': True})
