@@ -16,7 +16,7 @@ from flask import Flask, render_template, request, jsonify, send_file, session
 app = Flask(__name__)
 # --- CONFIG ---
 app.secret_key = os.environ.get("SECRET_KEY", "sdfeergrthbwefsDSlvsrgpsesvaflsvkvl")
-REQUEST_BOT_TOKEN = os.environ.get("REQUEST_BOT_TOKEN", "") # Токен для нового бота
+REQUEST_BOT_TOKEN = os.environ.get("REQUEST_BOT_TOKEN", "")
 HASH_USER = os.environ.get("HASH_USER", "a080f87fefbcc9ddfe34650dd5c20659b852fd8cdd8e269a2bc5c3f4ad7cd7cf")
 HASH_ADMIN = os.environ.get("HASH_ADMIN", "a5a915b49d0188897ddbdcaf47868a28af8d06851f3430bbe43e49660f05760a")
 HASH_WEB = os.environ.get("HASH_WEB", HASH_USER)
@@ -117,20 +117,14 @@ class PartnerRequest(db.Model):
     text = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.datetime.now)
 
-def get_40k_data(d_obj):
-    age = d_obj.year - 1992 - ((d_obj.month, d_obj.day) < (2, 16))
-    bday = date(1992 + age, 2, 16)
-    
-    delta_days = (d_obj - bday).days
-    week_num = (delta_days // 7) + 1
-    day_num = (delta_days % 7) + 1
-    
-    return f"{age}.{week_num}.{day_num}", f"{age}.{week_num}"
+def get_week_data(d_obj):
+    year, week, day = d_obj.isocalendar()
+    return f"{year}-W{week}-{day}", f"Week {week}"
 
 def ensure_calendar_entry(d_date):
     entry = db.session.get(Calendar, d_date)
     if not entry:
-        date_str, week_str = get_40k_data(d_date)
+        date_str, week_str = get_week_data(d_date)
         entry = Calendar(
             actual_date=d_date,
             date_40k=date_str,
@@ -184,52 +178,52 @@ def recalculate_chains(thread_id):
         print(f"Chain error: {e}")
 
 def is_day_fulfilled(thread, date_obj, squares_map):
-    try:
-        if not thread.cadence or thread.cadence == 'daily': return False
-        target_hits = 1
-        start_date = None
-        end_date = None
-        
-        if thread.cadence == '3x_week' or thread.cadence == 'weekly':
-            age = date_obj.year - 1992 - ((date_obj.month, date_obj.day) < (2, 16))
-            bday = date(1992 + age, 2, 16)
-            delta_days = (date_obj - bday).days
-            week_start_delta = (delta_days // 7) * 7
-            start_date = bday + timedelta(days=week_start_delta)
-            end_date = start_date + timedelta(days=6)
-            
-            if thread.cadence == '3x_week': target_hits = 3
-            
-        elif thread.cadence == 'monthly':
-            start_date = date_obj.replace(day=1)
-            next_month = (start_date + timedelta(days=32)).replace(day=1)
-            end_date = next_month - timedelta(days=1)
-        elif thread.cadence == 'quarterly':
-            quarter = (date_obj.month - 1) // 3 + 1
-            start_month = (quarter - 1) * 3 + 1
-            start_date = date(date_obj.year, start_month, 1)
-            if start_month + 3 > 12: end_date = date(date_obj.year, 12, 31)
-            else: end_date = date(date_obj.year, start_month + 3, 1) - timedelta(days=1)
-        elif thread.cadence == 'yearly':
-            start_date = date(date_obj.year, 1, 1)
-            end_date = date(date_obj.year, 12, 31)
-        else: return False
-
-        hits_count = 0
-        delta = (end_date - start_date).days
-        for i in range(delta + 1):
-            check_date = start_date + timedelta(days=i)
-            sq = squares_map.get((thread.thread_id, check_date))
-            if sq and sq.status == 'hit': hits_count += 1
-        
-        current_sq = squares_map.get((thread.thread_id, date_obj))
-        is_currently_hit = (current_sq and current_sq.status == 'hit')
-        if hits_count >= target_hits and not is_currently_hit: return True
+    if not thread.cadence or thread.cadence == 'daily': 
         return False
-    except Exception as e: 
-        print(f"Error in is_day_fulfilled: {e}")
-        return False
+        
+    target_hits = 1
+    start_date = None
+    end_date = None
     
+    if thread.cadence in ['3x_week', 'weekly']:
+        start_date = date_obj - timedelta(days=date_obj.weekday())
+        end_date = start_date + timedelta(days=6)
+        if thread.cadence == '3x_week': 
+            target_hits = 3
+    elif thread.cadence == 'monthly':
+        start_date = date_obj.replace(day=1)
+        next_month = (start_date + timedelta(days=32)).replace(day=1)
+        end_date = next_month - timedelta(days=1)
+    elif thread.cadence == 'quarterly':
+        quarter = (date_obj.month - 1) // 3 + 1
+        start_month = (quarter - 1) * 3 + 1
+        start_date = date(date_obj.year, start_month, 1)
+        if start_month + 3 > 12: 
+            end_date = date(date_obj.year, 12, 31)
+        else: 
+            end_date = date(date_obj.year, start_month + 3, 1) - timedelta(days=1)
+    elif thread.cadence == 'yearly':
+        start_date = date(date_obj.year, 1, 1)
+        end_date = date(date_obj.year, 12, 31)
+    else: 
+        return False
+
+    hits_count = 0
+    delta = (end_date - start_date).days
+    for i in range(delta + 1):
+        check_date = start_date + timedelta(days=i)
+        sq = squares_map.get((thread.thread_id, check_date))
+        if sq and sq.status == 'hit': 
+            hits_count += 1
+    
+    current_sq = squares_map.get((thread.thread_id, date_obj))
+    is_currently_hit = (current_sq and current_sq.status == 'hit')
+    
+    if hits_count >= target_hits and not is_currently_hit: 
+        return True
+        
+    return False
+        
 def create_full_backup_json():
     data = {}
     data['threads'] = [{
@@ -329,10 +323,12 @@ def send_scheduled_backup():
             timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')
             filename = f"backup_{timestamp}.json"
             
-for admin in admins:
+            for admin in admins:
                 if request_bot:
                     request_bot.send_document(admin.chat_id, backup_content.encode('utf-8'), visible_file_name=filename, caption=f"📦 Full Backup (JSON)")
-    
+    except Exception as e:
+        print(f"Backup failed: {e}")
+            
 # --- REQUEST BOT LOGIC ---
 if request_bot:
     @request_bot.message_handler(commands=['start', 'help'])
@@ -424,14 +420,6 @@ if request_bot:
             
         request_bot.reply_to(message, "✅ Added to the list!")
 
-def run_bot_thread():
-    if bot:
-        try:
-            print("Main Bot polling started...")
-            bot.polling(none_stop=True)
-        except Exception as e:
-            print(f"Main Bot crash: {e}")
-
 def run_request_bot_thread():
     if request_bot:
         try:
@@ -513,12 +501,7 @@ def index():
         threads = Thread.query.filter(Thread.status == 'active').order_by(Thread.rank.desc()).all()
         grouped_threads = {c: [] for c in categories}
         
-        age = today.year - 1992 - ((today.month, today.day) < (2, 16))
-        bday = date(1992 + age, 2, 16)
-        delta_today = (today - bday).days
-        current_week_num = (delta_today // 7) + 1
-        
-        start_of_current_week = bday + timedelta(days=(current_week_num - 1) * 7)
+        start_of_current_week = today - timedelta(days=today.weekday())
         
         start_date = start_of_current_week - timedelta(days=21)
         end_date = start_of_current_week + timedelta(days=6)
@@ -526,7 +509,7 @@ def index():
         week_headers = []
         for i in range(4):
             w_start = start_date + timedelta(days=i*7)
-            _, w_str = get_40k_data(w_start)
+            _, w_str = get_week_data(w_start)
             week_headers.append(w_str)
         
         off_routine_days = {c.actual_date: True for c in Calendar.query.filter(Calendar.off_routine_flag == True).all()}
@@ -628,7 +611,7 @@ def add_thread():
             thread_name=data.get('name'), thread_name_redacted=data.get('redacted', ''),
             category=data.get('category'), sub_category=data.get('sub_category', ''),
             type=data.get('type', 'perpetual'), cadence=data.get('cadence', 'daily'),
-            status='active', rank=max_rank + 1, created_at=today, created_at_40k=get_40k_data(today)[0]
+            status='active', rank=max_rank + 1, created_at=today, created_at_40k=get_week_data(today)[0]
         )
         db.session.add(new_th)
         db.session.commit()
