@@ -4,7 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Habit Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --mono: 'DM Mono', monospace;
+            
+            --ink: #1a1a1a;
+            --ink-mid: #888;
+            --ink-lt: #bbb;
+        }
         * {
             margin: 0;
             padding: 0;
@@ -12,9 +23,9 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            font-family: var(--sans);
             background: #fafafa;
-            color: #1a1a1a;
+            color: var(--ink);
             overflow-x: hidden;
         }
 
@@ -26,7 +37,7 @@
             margin: 0 auto;
         }
 
-        /* LEFT PANEL - Completed Tasks */
+/* ── LEFT PANEL ── */
         .left-panel {
             background: #ffffff;
             border-right: 1px solid #e0e0e0;
@@ -37,8 +48,11 @@
         }
 
         .task-log-header {
-            font-size: 18px;
+            font-size: 13px;
             font-weight: 600;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            color: #888;
             margin-bottom: 20px;
             padding-bottom: 12px;
             border-bottom: 1px solid #e0e0e0;
@@ -47,84 +61,57 @@
         .task-log {
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 0;
             overflow-y: auto;
             flex: 1;
-            padding-right: 5px;
+            padding-right: 4px;
         }
 
-        .task-bubble {
-            background: #f5f5f5;
-            padding: 12px 16px;
-            border-radius: 14px;
-            max-width: 85%;
+        .task-entry {
+            padding: 10px 0 10px 12px;
+            border-left: 2px solid #e0e0e0;
+            font-size: 12px;
             line-height: 1.5;
-            font-size: 14px;
+            color: #1a1a1a;
+            transition: border-color 0.15s;
         }
-
-        .task-bubble.left {
-            align-self: flex-start;
-            background: #f5f5f5;
-        }
-
-        .task-bubble.right {
-            align-self: flex-end;
-            background: #e8e8e8;
-        }
-
-        .task-text {
-            margin-bottom: 6px;
-        }
-
+        .task-entry + .task-entry { margin-top: 2px; }
+        .task-entry:hover { border-left-color: #888; }
+        .task-text { margin-bottom: 3px; }
         .task-timestamp {
-            font-size: 11px;
-            color: #666;
-            font-weight: 500;
-        }
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--ink-lt);
+    font-weight: 400;
+}
 
         .task-input-section {
-            margin-top: 24px;
-            padding-top: 20px;
+            margin-top: 20px;
+            padding-top: 16px;
             border-top: 1px solid #e0e0e0;
         }
-
         .task-input {
             width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 14px;
+            padding: 9px 11px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 12px;
             font-family: inherit;
+            background: #fafafa;
             resize: vertical;
-            min-height: 60px;
+            min-height: 56px;
             margin-bottom: 8px;
+            color: #1a1a1a;
         }
-
-        .task-input:focus {
-            outline: none;
-            border-color: #1a1a1a;
-        }
-
+        .task-input:focus { outline: none; border-color: #888; background: #fff; }
         .add-task-btn {
-            width: 100%;
-            padding: 10px;
-            background: #1a1a1a;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: background 0.2s;
+            width: 100%; padding: 9px;
+            background: #1a1a1a; color: white;
+            border: none; border-radius: 6px;
+            font-size: 12px; font-weight: 500;
+            cursor: pointer; transition: background 0.2s;
         }
-
-        .add-task-btn:hover {
-            background: #333;
-        }
-
-        .add-task-btn:active {
-            background: #000;
-        }
+        .add-task-btn:hover  { background: #444; }
 
         /* RIGHT PANEL - Habit Tracker */
         .right-panel {
@@ -142,10 +129,10 @@
         }
 
         .tracker-title {
-            font-size: 28px;
-            font-weight: 600;
-            letter-spacing: -0.5px;
-        }
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.4px;
+}
 
         .controls {
             display: flex;
@@ -176,79 +163,153 @@
             border-color: #d32f2f;
         }
 
-        /* GRID DYNAMICS */
-        .grid-container {
-            display: grid;
-            row-gap: 0px;
-            column-gap: 2px;
-            font-size: 11px;
-            padding-bottom: 50px;
-            align-items: center;
-        }
+    .edit-toggle {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 500;
+    color: #888; cursor: pointer;
+    padding: 6px 12px; border: 1px solid #e0e0e0;
+    border-radius: 6px; background: #fff;
+    transition: all 0.15s; user-select: none;
+}
+.edit-toggle:hover { color: #1a1a1a; background: #f5f5f5; }
+.edit-toggle.on { background: #fff8e1; border-color: #f0c040; color: #b45000; }
 
-        .week-header {
-            grid-row: 1;
-            text-align: center;
-            font-weight: 600;
-            padding: 8px 0;
-            font-size: 13px;
-        }
+.edit-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #e0e0e0; flex-shrink: 0; transition: background 0.2s;
+}
+.edit-toggle.on .edit-dot { background: #f0a020; }
 
-        .day-number {
-            grid-row: 2;
-            text-align: center;
-            font-size: 10px;
-            color: #666;
-            padding: 4px 0 8px 0;
-        }
+.cat-add-btn, .label-controls { 
+    display: none !important; 
+}
 
-        .category-header {
-            grid-column: 1 / -1;
-            font-weight: 700;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            padding: 12px 0 6px 0;
-            margin-top: 4px;
-            border-bottom: 1px solid #e0e0e0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+body.edit-mode .cat-add-btn { display: inline-block !important; }
+body.edit-mode .label-controls { display: flex !important; }
+
+.grid-wrapper {
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 16px 20px 28px 20px;
+    margin-top: 16px;
+    overflow-x: auto;
+}
+        
+.grid-container {
+    display: grid;
+    column-gap: 2px;
+    row-gap: 0;
+    justify-content: start;
+    align-items: center;
+    font-size: 11px;
+}
+
+.month-band, .week-band {
+    grid-row-start: auto;
+    position: relative;
+    display: flex; 
+    align-items: center;
+    justify-content: center;
+    padding: 4px 0;
+    min-width: 0;
+}
+
+.month-band { grid-row: 1; margin-top: 8px; }
+.week-band { grid-row: 2; }
+
+.month-band-line, .week-band-line {
+    position: absolute; top: 50%; left: 0; right: 0;
+    height: 1px; background: #e8e6e0;
+    z-index: 0;
+}
+
+.month-band-label, .week-band-label {
+    position: relative; z-index: 1;
+    background: #fafafa;
+    padding: 0 10px;
+    font-size: 11px; font-weight: 600; color: #888;
+    white-space: nowrap;
+}
+
+.week-band-label { 
+    font-family: var(--mono); font-size: 9px; color: #bbb; 
+}
+.day-date { grid-row: 3; text-align: center; font-family: var(--mono); font-size: 9px; font-weight: 500; color: #888; }
+.day-letter { 
+    grid-row: 4; 
+    text-align: center; 
+    font-family: var(--mono); 
+    font-size: 9px; 
+    font-weight: 300; 
+    color: #d4d0c8; 
+    padding-bottom: 0px;
+}
+
+.category-header {
+    grid-column: 1 / -1;
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 3px 0 3px 0;
+    margin-top: 0;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.week-header {
+    grid-row: 1;
+    text-align: center;
+    font-family: var(--sans);
+    font-weight: 600;
+    padding: 8px 0;
+    font-size: 13px;
+    color: var(--ink-mid);
+}
+
+.day-number {
+    grid-row: 2;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--ink-lt);
+    padding: 4px 0 8px 0;
+}
 
         .cat-add-btn { 
-            display: {{ 'inline-block' if is_auth else 'none' }} !important; 
-            cursor: pointer; 
-            font-size: 13px; 
-            font-weight: 600; 
-            color: #1a1a1a;
-            background: #f5f5f5;
-            border: 1px solid #ddd;
-            padding: 4px 10px;
-            border-radius: 6px;
-            transition: all 0.2s;
-            
-            position: sticky;
-            right: 0px; 
-            z-index: 10;
-        }
+    display: none;
+    cursor: pointer; 
+    font-size: 12px;
+    font-weight: 400; 
+    color: #bbb;
+    background: none;
+    border: none;
+    padding: 0;
+    line-height: 1;
+    transition: color 0.15s;
+    position: relative;
+    z-index: 10;
+}
 
         .cat-add-btn:hover {
-            background: #e8e8e8;
+            color: #1a1a1a;
         }
         
 
         .habit-label {
             grid-column: 1;
-            padding: 0px 12px 0px 0;
+            padding: 0px 6px 0px 0;
             display: flex;
             align-items: center;
             justify-content: space-between;
             font-size: 12px;
             min-height: 16px;
+            gap: 6px;
         }
 .label-controls { 
-   display: {{ 'flex' if is_auth else 'none' }} !important; 
+    display: none;
     gap: 4px; 
     flex-shrink: 0;
 }
@@ -273,6 +334,7 @@
         }
 
         .habit-cell.completed { background: #1a1a1a; }
+        .habit-cell.completed.past-week { background: #8a9097; border-color: #8a9097; }
         
 .habit-cell.miss { 
     background: repeating-linear-gradient(
@@ -350,10 +412,23 @@
             });
         }
 
+        function toggleEditMode() {
+            document.body.classList.toggle('edit-mode');
+            const isOn = document.body.classList.contains('edit-mode');
+            
+            localStorage.setItem('habitEditMode', isOn);
+            
+            const btn = document.getElementById('editToggleBtn');
+            if (btn) {
+                btn.classList.toggle('on', isOn);
+                const label = btn.querySelector('.edit-label');
+                if(label) label.textContent = isOn ? 'Edit: ON' : 'Edit: OFF';
+            }
+        }
+
         function logoutAuth() {
             fetch('/api/logout', {method: 'POST'}).then(() => location.reload());
         }
-        // Backend JS Functions
         function showModalWindow(id) { document.getElementById(id).classList.add('active'); }
         function hideModalWindow(id) { document.getElementById(id).classList.remove('active'); }
 
@@ -463,6 +538,7 @@ function updateSquare(el, status, reason) {
             if (status === 'miss') newClass += 'miss ';
             if (el.classList.contains('is-today')) newClass += 'is-today ';
             if (el.classList.contains('off-routine')) newClass += 'off-routine ';
+            if (el.classList.contains('past-week')) newClass += 'past-week ';
             
             el.className = newClass;
             
@@ -534,6 +610,15 @@ function updateSquare(el, status, reason) {
         function importData() { alert("Please send the JSON file to the Telegram Bot to restore."); }
         
         document.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('habitEditMode') === 'true') {
+                document.body.classList.add('edit-mode');
+                const btn = document.getElementById('editToggleBtn');
+                if (btn) {
+                    btn.classList.add('on');
+                    const label = btn.querySelector('.edit-label');
+                    if(label) label.textContent = 'Edit: ON';
+                }
+            }
             const taskInput = document.getElementById('taskInput');
             if (taskInput) {
                 taskInput.addEventListener('keydown', (e) => {
@@ -549,106 +634,152 @@ function updateSquare(el, status, reason) {
 <body>
     <div class="container">
         <div class="left-panel">
-            <div class="task-log-header">Completed Tasks</div>
+            <div class="task-log-header">Log</div>
             <div class="task-log" id="taskLog">
                 {% if ctx.comment_list %}
                     {% for msg in ctx.comment_list %}
-                        <div class="task-bubble {% if loop.index % 2 == 0 %}right{% else %}left{% endif %}">
+                        <div class="task-entry">
                             <div class="task-text">{{ msg.text }}</div>
                             <div class="task-timestamp">{{ msg.date }} · {{ msg.time if msg.time else "--:--" }}</div>
                         </div>
                     {% endfor %}
                 {% else %}
-                    <div style="color:#999; text-align:center; margin-top:50px; font-size: 13px;">No tasks yet.</div>
+                    <div style="color:#999; text-align:center; margin-top:50px; font-size: 12px;">No entries yet.</div>
                 {% endif %}
             </div>
+
+            {% if is_auth %}
+            <div class="task-input-section">
+                <textarea id="taskInput" class="task-input" placeholder="Log a note…"></textarea>
+                <button class="add-task-btn" onclick="addTaskAPI()">Add Entry</button>
+            </div>
+            {% endif %}
         </div>
 
         <div class="right-panel">
             <div class="tracker-header">
                 <h1 class="tracker-title">Habit Tracker</h1>
                 <div class="controls">
-                    {% if is_auth %}
-                        <button class="control-btn" onclick="showModalWindow('contextModal')">Day Context</button>
-                        <button class="control-btn" onclick="exportData()">Export Data</button>
-                        <button class="control-btn danger" onclick="showModalWindow('resetModal')">Reset All</button>
-                        <button class="control-btn" onclick="logoutAuth()">Lock</button>
-                    {% else %}
-                        <button class="control-btn" onclick="showModalWindow('loginModal')">Unlock Edit Mode</button>
-                    {% endif %}
-                </div>
+    {% if is_auth %}
+        <div class="edit-toggle" id="editToggleBtn" onclick="toggleEditMode()">
+            <span class="edit-dot"></span>
+            <span class="edit-label">Edit: OFF</span>
+        </div>
+
+        <button class="control-btn" onclick="showModalWindow('contextModal')">Day Context</button>
+        <button class="control-btn" onclick="exportData()">Export Data</button>
+        <button class="control-btn danger" onclick="showModalWindow('resetModal')">Reset All</button>
+        <button class="control-btn" onclick="logoutAuth()">Lock</button>
+    {% else %}
+        <button class="control-btn" onclick="showModalWindow('loginModal')">Unlock Edit Mode</button>
+    {% endif %}
+</div>
             </div>
             
             {% set first_cat = categories[0] %}
             {% if grouped_threads[first_cat] and grouped_threads[first_cat][0] %}
-                {% set total_days = grouped_threads[first_cat][0].weeks | length * 7 %}
+                {% set total_weeks = grouped_threads[first_cat][0].weeks | length %}
             {% else %}
-                {% set total_days = 365 %}
+                {% set total_weeks = 52 %}
             {% endif %}
 
-            <div class="grid-container" style="grid-template-columns: max-content repeat({{ total_days }}, 14px);">
-                
-                {% if week_headers %}
-                    {% for header in week_headers %}
-                        <div class="week-header" style="grid-column: {{ 2 + loop.index0 * 7 }} / span 7;">{{ header }}</div>
-                    {% endfor %}
-                    
-                    {% set header_col = namespace(value=2) %}
-                    {% for _ in week_headers %}
-                        {% for i in range(1, 8) %}
-                            <div class="day-number" style="grid-column: {{ header_col.value }};">{{ i }}</div>
-                            {% set header_col.value = header_col.value + 1 %}
-                        {% endfor %}
-                    {% endfor %}
-                {% endif %}
+            <div class="grid-wrapper"> 
+            <div class="grid-container" style="grid-template-columns: max-content repeat({{ total_weeks }}, 14px 14px 14px 14px 14px 14px 14px 3px);">    {% if week_headers %}
+        {% set months_names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] %}
+        
+        {% set ns = namespace(prev_month='') %}
+        
+        {% for header in week_headers %}
+            {% set w_idx = loop.index0 %}
+            {% set start_col = 2 + (w_idx * 8) %}
+            
+            {% set first_day = grouped_threads[categories[0]][0].weeks[w_idx][0].date %}
+            {% set current_month = months_names[first_day.split('-')[1]|int - 1] %}
 
-                {% for cat in categories %}
-                    <div class="category-header">
-                        <span>{{ cat|title }}</span>
-                        {% if is_auth %}
-                            <span class="cat-add-btn" onclick="openAddModal('{{ cat }}')" style="display: inline-block !important;">+ Add</span>
+            {% if current_month != ns.prev_month %}
+                
+                {% set span_ns = namespace(weeks_count=0, diff_found=false) %}
+                {% for lookahead in week_headers %}
+                    {% set l_idx = loop.index0 %}
+                    {% if l_idx >= w_idx and not span_ns.diff_found %}
+                        {% set l_first_day = grouped_threads[categories[0]][0].weeks[l_idx][0].date %}
+                        {% set l_month = months_names[l_first_day.split('-')[1]|int - 1] %}
+                        
+                        {% if l_month == current_month %}
+                            {% set span_ns.weeks_count = span_ns.weeks_count + 1 %}
+                        {% else %}
+                            {% set span_ns.diff_found = true %}
                         {% endif %}
-                    </div>
-                    
-                    {% for item in grouped_threads[cat] %}
-                        <div class="habit-label">
-                            <span style="white-space: nowrap; padding-right: 15px;">{{ item.info.thread_name }}</span>
-                            
-                            {% if is_auth %}
-                            <div class="label-controls" style="display: flex !important;">
-    <button class="l-btn" onclick="openEditModal('{{ item.info.thread_id }}', '{{ item.info.thread_name }}', '{{ item.info.thread_name_redacted or '' }}', '{{ item.info.sub_category or '' }}', '{{ item.info.type }}', '{{ item.info.cadence }}')">✎</button>
+                    {% endif %}
+                {% endfor %}
+
+                {% set span_cols = (span_ns.weeks_count * 8) - 1 %}
+
+                <div class="month-band" style="grid-column: {{ start_col }} / span {{ span_cols }};">
+                    <span class="month-band-label">{{ current_month }}</span>
+                    <span class="month-band-line"></span>
+                </div>
+
+                {% set ns.prev_month = current_month %}
+            {% endif %}
+
+            <div class="week-band" style="grid-column: {{ start_col }} / span 7;">
+                <span class="week-band-label">{{ header }}</span>
+                <span class="week-band-line"></span>
+            </div>
+        {% endfor %}
+        
+        {% set days_letters = ['M','T','W','T','F','S','S'] %}
+        {% for week in grouped_threads[categories[0]][0].weeks %}
+            {% set w_idx = loop.index0 %}
+            {% for day in week %}
+                {% set d_idx = loop.index0 %}
+                {% set col = 2 + (w_idx * 8) + d_idx %}
+                <div class="day-date" style="grid-column: {{ col }};">{{ day.date.split('-')[-1] }}</div>
+                <div class="day-letter" style="grid-column: {{ col }};">{{ days_letters[d_idx] }}</div>
+            {% endfor %}
+        {% endfor %}
+    {% endif %}
+
+    {% for cat in categories %}
+        <div class="category-header">
+            <span>{{ cat|upper }}</span>
+            {% if is_auth %}
+                <button class="cat-add-btn" onclick="openAddModal('{{ cat }}')">＋</button>
+            {% endif %}
+        </div>
+        
+        {% for item in grouped_threads[cat] %}
+            <div class="habit-label">
+                <span class="habit-name">{{ item.info.thread_name }}</span>
+                <div class="label-controls">
     <button class="l-btn" onclick="moveThread('{{ item.info.thread_id }}', 'up')">↑</button>
     <button class="l-btn" onclick="moveThread('{{ item.info.thread_id }}', 'down')">↓</button>
+    <button class="l-btn" onclick="openEditModal('{{ item.info.thread_id }}', '{{ item.info.thread_name }}', '{{ item.info.thread_name_redacted or '' }}', '{{ item.info.sub_category or '' }}', '{{ item.info.type }}', '{{ item.info.cadence }}')">✎</button>
     <button class="l-btn red" onclick="deleteThread('{{ item.info.thread_id }}', '{{ item.info.thread_name }}')">×</button>
 </div>
-                            {% endif %}
-                        </div>
-                        
-                        {% set col_counter = namespace(value=2) %}
-                        {% for week in item.weeks %}
-                            {% set w_index = loop.index0 %}
-                            {% for day in week %}
-                                {% if day.is_padding %}
-                                    <div class="habit-cell padding" style="grid-column: {{ col_counter.value }};"></div>
-                                {% else %}
-                                    <div class="habit-cell {% if day.status == 'hit' %}completed{% elif day.status == 'miss' %}miss{% endif %} {% if day.is_today %}is-today{% endif %} {% if day.is_off_routine %}off-routine{% endif %} {% if day.is_fulfilled %}fulfilled{% endif %}"
-                                         style="grid-column: {{ col_counter.value }};"
-                                         data-id="{{ item.info.thread_id }}"
-                                         data-date="{{ day.date }}"
-                                         data-status="{{ day.status }}"
-                                         data-week="{{ w_index }}"          data-cadence="{{ item.info.cadence }}" {% if day.miss_reason %}data-reason="{{ day.miss_reason }}"{% endif %}
-                                         onclick="handleCellClick(this)"
-                                         oncontextmenu="handleRightClick(event, this)">
-                                    </div>
-                                {% endif %}
-                                {% set col_counter.value = col_counter.value + 1 %}
-                            {% endfor %}
-                        {% endfor %}
-                    {% endfor %}
-                {% endfor %}
             </div>
-        </div>
-    </div>
+            
+            {% for week in item.weeks %}
+                {% set w_idx = loop.index0 %}
+                {% set is_last_week = loop.last %}
+                {% for day in week %}
+                    {% set d_idx = loop.index0 %}
+                    {% set current_col = 2 + (w_idx * 8) + d_idx %}
+                    
+                    <div class="habit-cell {% if day.status == 'hit' %}completed{% elif day.status == 'miss' %}miss{% endif %} {% if day.is_today %}is-today{% endif %} {% if not is_last_week %}past-week{% endif %}"
+                         style="grid-column: {{ current_col }};"
+                         data-id="{{ item.info.thread_id }}"
+                         data-date="{{ day.date }}"
+                         data-status="{{ day.status }}"
+                         onclick="handleCellClick(this)"
+                         oncontextmenu="handleRightClick(event, this)">
+                    </div>
+                {% endfor %}
+            {% endfor %}
+        {% endfor %}
+    {% endfor %}
+</div> </div>
 
     <div class="modal" id="resetModal">
         <div class="modal-content">
