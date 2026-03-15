@@ -431,6 +431,7 @@ body.edit-mode .label-controls { display: flex !important; }
         }
 
         function setSortMode(mode) {
+    localStorage.setItem('habitSortMode', mode);
     document.querySelectorAll('.sort-tgl').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
 
     const typeHeaders = document.querySelectorAll('.type-header');
