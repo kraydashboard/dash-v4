@@ -689,6 +689,11 @@ function updateSquare(el, status, reason) {
                     if(label) label.textContent = 'Edit: ON';
                 }
             }
+
+            const savedSortMode = localStorage.getItem('habitSortMode');
+    if (savedSortMode) {
+        setSortMode(savedSortMode);
+    }
             const taskInput = document.getElementById('taskInput');
             if (taskInput) {
                 taskInput.addEventListener('keydown', (e) => {
