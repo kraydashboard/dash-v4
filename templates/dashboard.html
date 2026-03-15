@@ -37,6 +37,23 @@
             margin: 0 auto;
         }
 
+.toggle-group {
+    display: flex; border: 1px solid #e0e0e0; border-radius: 6px; overflow: hidden; background: #fff; margin-right: 8px;
+}
+.tgl-btn {
+    padding: 6px 12px; background: transparent; border: none; font-size: 12px; font-weight: 500; cursor: pointer; color: #888; transition: all 0.15s; white-space: nowrap;
+}
+.tgl-btn:hover { color: #1a1a1a; background: #f5f5f5; }
+.tgl-btn.active { background: #1a1a1a; color: #fff; }
+.tgl-btn + .tgl-btn { border-left: 1px solid #e0e0e0; }
+
+.time-group-header {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 12px 0 4px 0; border-bottom: 1px solid #e0e0e0;
+}
+.time-group-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #888; white-space: nowrap;
+}
+
 /* ── LEFT PANEL ── */
         .left-panel {
             background: #ffffff;
@@ -413,6 +430,32 @@ body.edit-mode .label-controls { display: flex !important; }
             });
         }
 
+        function setSortMode(mode) {
+    document.querySelectorAll('.sort-tgl').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+
+    const typeHeaders = document.querySelectorAll('.type-header');
+    const timeHeaders = document.querySelectorAll('.time-header');
+    const labels = document.querySelectorAll('.habit-label');
+    const cells = document.querySelectorAll('.habit-cell');
+
+    const typeMap = {'work': 10000, 'maintenance': 20000, 'family': 30000, 'self care': 40000};
+    const timeMap = {'morning': 10000, 'midday': 20000, 'evening': 30000, 'night': 40000, 'unspecified': 50000};
+
+    if (mode === 'type') {
+        typeHeaders.forEach(h => { h.style.display = 'flex'; h.style.order = typeMap[h.dataset.cat] || 90000; });
+        timeHeaders.forEach(h => h.style.display = 'none');
+
+        labels.forEach(l => { l.style.order = (typeMap[l.dataset.cat] || 90000) + parseInt(l.dataset.idx); });
+        cells.forEach(c => { c.style.order = (typeMap[c.dataset.cat] || 90000) + parseInt(c.dataset.idx); });
+    } else {
+        typeHeaders.forEach(h => h.style.display = 'none');
+        timeHeaders.forEach(h => { h.style.display = 'flex'; h.style.order = timeMap[h.dataset.time] || 90000; });
+
+        labels.forEach(l => { l.style.order = (timeMap[l.dataset.time] || 50000) + parseInt(l.dataset.idx); });
+        cells.forEach(c => { c.style.order = (timeMap[c.dataset.time] || 50000) + parseInt(c.dataset.idx); });
+    }
+}
+
         function toggleEditMode() {
             document.body.classList.toggle('edit-mode');
             const isOn = document.body.classList.contains('edit-mode');
@@ -450,49 +493,41 @@ body.edit-mode .label-controls { display: flex !important; }
         }
         
         function submitNewThread() {
-            const payload = {
-                name: document.getElementById('newThreadName').value,
-                category: currentCat,
-                redacted: document.getElementById('newThreadRedacted').value,
-                sub_category: document.getElementById('newThreadSubCat').value,
-                type: document.getElementById('newThreadType').value,
-                cadence: document.getElementById('newThreadCadence').value
-            };
-            fetch('/api/add_thread', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) }).then(r => r.json()).then(d => { if(d.success) location.reload(); else alert(d.error); });
-        }
+    const payload = {
+        name: document.getElementById('newThreadName').value,
+        category: currentCat,
+        redacted: document.getElementById('newThreadRedacted').value,
+        sub_category: document.getElementById('newThreadSubCat').value,
+        type: document.getElementById('newThreadType').value,
+        cadence: document.getElementById('newThreadCadence').value,
+        time_of_day: document.getElementById('newThreadTime').value // НОВЕ ПОЛЕ
+    };
+    fetch('/api/add_thread', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) }).then(r => r.json()).then(d => { if(d.success) location.reload(); else alert(d.error); });
+}
 
-        function openEditModal(id, name, redacted, subCat, type, cadence) {
-            document.getElementById('editThreadId').value = id;
-            document.getElementById('editThreadName').value = name || '';
-            document.getElementById('editThreadRedacted').value = redacted || '';
-            document.getElementById('editThreadSubCat').value = subCat || '';
-            document.getElementById('editThreadType').value = type || 'perpetual';
-            document.getElementById('editThreadCadence').value = cadence || 'daily';
-            
-            showModalWindow('editThreadModal');
-        }
+        function openEditModal(id, name, redacted, subCat, type, cadence, time_of_day) { // ДОДАНО АРГУМЕНТ
+    document.getElementById('editThreadId').value = id;
+    document.getElementById('editThreadName').value = name || '';
+    document.getElementById('editThreadRedacted').value = redacted || '';
+    document.getElementById('editThreadSubCat').value = subCat || '';
+    document.getElementById('editThreadType').value = type || 'perpetual';
+    document.getElementById('editThreadCadence').value = cadence || 'daily';
+    document.getElementById('editThreadTime').value = time_of_day || 'unspecified'; // НОВЕ ПОЛЕ
+    showModalWindow('editThreadModal');
+}
 
         function submitEditThread() {
-            const payload = {
-                id: document.getElementById('editThreadId').value,
-                name: document.getElementById('editThreadName').value,
-                redacted: document.getElementById('editThreadRedacted').value,
-                sub_category: document.getElementById('editThreadSubCat').value,
-                type: document.getElementById('editThreadType').value,
-                cadence: document.getElementById('editThreadCadence').value
-            };
-            
-            fetch('/api/edit_thread', { 
-                method: 'POST', 
-                headers: {'Content-Type': 'application/json'}, 
-                body: JSON.stringify(payload) 
-            })
-            .then(r => r.json())
-            .then(d => { 
-                if(d.success) location.reload(); 
-                else alert(d.error); 
-            });
-        }
+    const payload = {
+        id: document.getElementById('editThreadId').value,
+        name: document.getElementById('editThreadName').value,
+        redacted: document.getElementById('editThreadRedacted').value,
+        sub_category: document.getElementById('editThreadSubCat').value,
+        type: document.getElementById('editThreadType').value,
+        cadence: document.getElementById('editThreadCadence').value,
+        time_of_day: document.getElementById('editThreadTime').value // НОВЕ ПОЛЕ
+    };
+    fetch('/api/edit_thread', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) }).then(r => r.json()).then(d => { if(d.success) location.reload(); else alert(d.error); });
+}
         
         function openContextModalFromHeader() {
             activeCell = null;
@@ -695,6 +730,10 @@ function updateSquare(el, status, reason) {
                 <h1 class="tracker-title">Habit Tracker</h1>
                 <div class="controls">
     {% if is_auth %}
+        <div class="toggle-group">
+            <button class="tgl-btn sort-tgl active" data-mode="type" onclick="setSortMode('type')">By Type</button>
+            <button class="tgl-btn sort-tgl" data-mode="time" onclick="setSortMode('time')">By Time</button>
+        </div>
         <div class="edit-toggle" id="editToggleBtn" onclick="toggleEditMode()">
             <span class="edit-dot"></span>
             <span class="edit-label">Edit: OFF</span>
@@ -774,8 +813,9 @@ function updateSquare(el, status, reason) {
         {% endfor %}
     {% endif %}
 
+    {% set ns_sort = namespace(idx=0) %}
     {% for cat in categories %}
-        <div class="category-header">
+        <div class="category-header type-header" data-cat="{{ cat }}">
             <span>{{ cat|upper }}</span>
             {% if is_auth %}
                 <button class="cat-add-btn" onclick="openAddModal('{{ cat }}')">＋</button>
@@ -783,14 +823,17 @@ function updateSquare(el, status, reason) {
         </div>
         
         {% for item in grouped_threads[cat] %}
-            <div class="habit-label">
+            {% set ns_sort.idx = ns_sort.idx + 1 %}
+            {% set t_time = item.info.time_of_day if item.info.time_of_day else 'unspecified' %}
+            
+            <div class="habit-label" data-idx="{{ ns_sort.idx }}" data-cat="{{ cat }}" data-time="{{ t_time }}">
                 <span class="habit-name">{{ item.info.thread_name }}</span>
                 <div class="label-controls">
-    <button class="l-btn" onclick="moveThread('{{ item.info.thread_id }}', 'up')">↑</button>
-    <button class="l-btn" onclick="moveThread('{{ item.info.thread_id }}', 'down')">↓</button>
-    <button class="l-btn" onclick="openEditModal('{{ item.info.thread_id }}', '{{ item.info.thread_name }}', '{{ item.info.thread_name_redacted or '' }}', '{{ item.info.sub_category or '' }}', '{{ item.info.type }}', '{{ item.info.cadence }}')">✎</button>
-    <button class="l-btn red" onclick="deleteThread('{{ item.info.thread_id }}', '{{ item.info.thread_name }}')">×</button>
-</div>
+                    <button class="l-btn" onclick="moveThread('{{ item.info.thread_id }}', 'up')">↑</button>
+                    <button class="l-btn" onclick="moveThread('{{ item.info.thread_id }}', 'down')">↓</button>
+                    <button class="l-btn" onclick="openEditModal('{{ item.info.thread_id }}', '{{ item.info.thread_name }}', '{{ item.info.thread_name_redacted or '' }}', '{{ item.info.sub_category or '' }}', '{{ item.info.type }}', '{{ item.info.cadence }}', '{{ t_time }}')">✎</button>
+                    <button class="l-btn red" onclick="deleteThread('{{ item.info.thread_id }}', '{{ item.info.thread_name }}')">×</button>
+                </div>
             </div>
             
             {% for week in item.weeks %}
@@ -801,18 +844,27 @@ function updateSquare(el, status, reason) {
                     {% set current_col = 2 + (w_idx * 8) + d_idx %}
                     
                     <div class="habit-cell {% if day.status == 'hit' %}completed{% endif %} {% if day.is_today %}is-today{% endif %} {% if not is_last_week %}past-week{% endif %}"
-     style="grid-column: {{ current_col }};"
-     data-id="{{ item.info.thread_id }}"
-     data-date="{{ day.date }}"
-     data-status="{{ day.status }}"
-     data-week="{{ w_idx }}"
-     {% if day.miss_reason %}data-reason="{{ day.miss_reason }}"{% endif %}
-     onclick="handleCellClick(this)"
-     oncontextmenu="handleRightClick(event, this)">
-</div>
+                         style="grid-column: {{ current_col }};"
+                         data-id="{{ item.info.thread_id }}"
+                         data-date="{{ day.date }}"
+                         data-status="{{ day.status }}"
+                         data-week="{{ w_idx }}"
+                         data-idx="{{ ns_sort.idx }}" data-cat="{{ cat }}" data-time="{{ t_time }}"
+                         {% if day.miss_reason %}data-reason="{{ day.miss_reason }}"{% endif %}
+                         onclick="handleCellClick(this)"
+                         oncontextmenu="handleRightClick(event, this)">
+                    </div>
                 {% endfor %}
             {% endfor %}
         {% endfor %}
+    {% endfor %}
+
+    {% set time_keys = ['morning', 'midday', 'evening', 'night', 'unspecified'] %}
+    {% set time_labels = {'morning': '🌅 Morning', 'midday': '☀️ Midday', 'evening': '🌆 Evening', 'night': '🌙 Night', 'unspecified': '❔ Unspecified'} %}
+    {% for t_key in time_keys %}
+        <div class="time-group-header time-header" data-time="{{ t_key }}" style="display:none;">
+            <span class="time-group-label">{{ time_labels[t_key] }}</span>
+        </div>
     {% endfor %}
 </div> </div>
 
@@ -844,6 +896,14 @@ function updateSquare(el, status, reason) {
                     <option value="quarterly">Seasonally</option>
                     <option value="yearly">Yearly</option>
                 </select>
+                <label class="m-label">Time of Day</label>
+<select id="newThreadTime" class="m-input">
+    <option value="morning">🌅 Morning</option>
+    <option value="midday">☀️ Midday</option>
+    <option value="evening">🌆 Evening</option>
+    <option value="night">🌙 Night</option>
+    <option value="unspecified" selected>❔ Unspecified</option>
+</select>
             </div>
             <div class="modal-buttons">
                 <button class="modal-btn cancel" onclick="hideModalWindow('addThreadModal')">Cancel</button>
@@ -882,6 +942,17 @@ function updateSquare(el, status, reason) {
                     <option value="quarterly">Seasonally</option>
                     <option value="yearly">Yearly</option>
                 </select>
+
+                <label class="m-label">Time of Day</label>
+<select id="editThreadTime" class="m-input">
+    <option value="morning">🌅 Morning</option>
+    <option value="midday">☀️ Midday</option>
+    <option value="evening">🌆 Evening</option>
+    <option value="night">🌙 Night</option>
+    <option value="unspecified">❔ Unspecified</option>
+</select>
+
+                
             </div>
             <div class="modal-buttons">
                 <button class="modal-btn cancel" onclick="hideModalWindow('editThreadModal')">Cancel</button>
