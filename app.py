@@ -70,7 +70,8 @@ class Thread(db.Model):
     thread_name_redacted = db.Column(db.String(100))
     sub_category = db.Column(db.String(50))
     type = db.Column(db.String(20))     
-    cadence = db.Column(db.String(50)) 
+    cadence = db.Column(db.String(50))
+    time_of_day = db.Column(db.String(20), default='unspecified')
 
 class Chain(db.Model):
     __tablename__ = 'chains'
@@ -231,7 +232,8 @@ def create_full_backup_json():
         'status': t.status, 'rank': t.rank, 'created_at': str(t.created_at),
         'created_at_40k': t.created_at_40k, 'closed_date': str(t.closed_date) if t.closed_date else None,
         'sub_category': t.sub_category, 'type': t.type, 'cadence': t.cadence,
-        'thread_name_redacted': t.thread_name_redacted
+        'thread_name_redacted': t.thread_name_redacted,
+        'time_of_day': t.time_of_day
     } for t in Thread.query.all()]
     data['squares'] = [{
         'square_id': s.square_id, 'thread_id': s.thread_id, 'period': str(s.period), 
@@ -271,7 +273,8 @@ def restore_from_json(json_content):
                 status=t['status'], rank=t['rank'], created_at=dt, 
                 created_at_40k=t.get('created_at_40k'), closed_date=closed, 
                 sub_category=t.get('sub_category'), type=t.get('type'), 
-                cadence=t.get('cadence'), thread_name_redacted=t.get('thread_name_redacted')
+                cadence=t.get('cadence'), thread_name_redacted=t.get('thread_name_redacted'),
+                time_of_day=t.get('time_of_day', 'unspecified')
             )
             db.session.add(th)
         db.session.commit() 
@@ -610,6 +613,7 @@ def add_thread():
             thread_name=data.get('name'), thread_name_redacted=data.get('redacted', ''),
             category=data.get('category'), sub_category=data.get('sub_category', ''),
             type=data.get('type', 'perpetual'), cadence=data.get('cadence', 'daily'),
+            time_of_day=data.get('time_of_day', 'unspecified'),
             status='active', rank=max_rank + 1, created_at=today, created_at_40k=get_week_data(today)[0]
         )
         db.session.add(new_th)
@@ -643,6 +647,7 @@ def edit_thread():
             thread.sub_category = data.get('sub_category', '')
             thread.type = data.get('type', 'perpetual')
             thread.cadence = data.get('cadence', 'daily')
+            thread.time_of_day = data.get('time_of_day', 'unspecified')
             db.session.commit()
             return jsonify({'success': True})
             
@@ -669,6 +674,13 @@ def move_thread():
 # --- STARTUP LOGIC ---
 with app.app_context():
     db.create_all()
+    try:
+        db.session.execute(db.text("ALTER TABLE threads ADD COLUMN time_of_day VARCHAR(20) DEFAULT 'unspecified'"))
+        db.session.commit()
+        print("Column 'time_of_day' added successfully.")
+    except Exception:
+        db.session.rollback()
+
     scheduler.init_app(app)
     scheduler.start()
     if not scheduler.get_job('auto_backup'):
