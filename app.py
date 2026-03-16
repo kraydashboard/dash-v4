@@ -674,12 +674,21 @@ def move_thread():
 # --- STARTUP LOGIC ---
 with app.app_context():
     db.create_all()
+    
     try:
         db.session.execute(db.text("ALTER TABLE threads ADD COLUMN time_of_day VARCHAR(20) DEFAULT 'unspecified'"))
         db.session.commit()
-        print("Column 'time_of_day' added successfully.")
     except Exception:
         db.session.rollback()
+
+    if db.engine.name == 'postgresql':
+        try:
+            db.session.execute(db.text("SELECT setval(pg_get_serial_sequence('threads', 'thread_id'), COALESCE((SELECT MAX(thread_id) FROM threads), 1))"))
+            db.session.commit()
+            print("PostgreSQL sequence synced.")
+        except Exception as e:
+            db.session.rollback()
+            print(f"Sequence sync error: {e}")
 
     scheduler.init_app(app)
     scheduler.start()
