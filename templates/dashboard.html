@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Habit Tracker</title>
+    <title>Escape Velocity</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -130,7 +130,7 @@
         }
         .add-task-btn:hover  { background: #444; }
 
-        /* RIGHT PANEL - Habit Tracker */
+        /* RIGHT PANEL - Escape Velocity */
         .right-panel {
             background: #ffffff;
             padding: 24px 32px;
@@ -149,6 +149,20 @@
     font-size: 22px;
     font-weight: 600;
     letter-spacing: -0.4px;
+}
+.tracker-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.4px;
+}
+
+.title-icon {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
 }
 
         .controls {
@@ -413,6 +427,32 @@ body.edit-mode .label-controls { display: flex !important; }
             width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #ddd; border-radius: 6px; font-family: inherit; font-size: 13px;
         }
         .m-label { display: block; text-align: left; font-size: 12px; color: #666; margin-bottom: 4px; font-weight: 600; }
+        
+        .habit-cell[data-reason]:not(.completed):not(.miss) {
+            background: #e3f2fd;
+            border-color: #90caf9;
+        }
+
+        .habit-cell.completed[data-reason] { 
+            background: #153e75; 
+            border-color: #153e75; 
+        }
+
+        .habit-cell.completed.past-week[data-reason] { 
+            background: #547fb0; 
+            border-color: #547fb0; 
+        }
+        
+        .habit-cell.miss[data-reason] { 
+            background: repeating-linear-gradient(
+                45deg,
+                #153e75,
+                #153e75 2px,
+                #ffffff 2px,
+                #ffffff 4px
+            );
+            border-color: #153e75;
+        }
     </style>
 
     <script>
@@ -439,7 +479,7 @@ body.edit-mode .label-controls { display: flex !important; }
     const labels = document.querySelectorAll('.habit-label');
     const cells = document.querySelectorAll('.habit-cell');
 
-    const typeMap = {'work': 10000, 'maintenance': 20000, 'family': 30000, 'self care': 40000};
+    const typeMap = {'work': 10000, 'maintenance': 20000, 'family': 30000, 'quests': 35000, 'self care': 40000};
     const timeMap = {'morning': 10000, 'midday': 20000, 'evening': 30000, 'night': 40000, 'unspecified': 50000};
 
     if (mode === 'type') {
@@ -501,19 +541,19 @@ body.edit-mode .label-controls { display: flex !important; }
         sub_category: document.getElementById('newThreadSubCat').value,
         type: document.getElementById('newThreadType').value,
         cadence: document.getElementById('newThreadCadence').value,
-        time_of_day: document.getElementById('newThreadTime').value // НОВЕ ПОЛЕ
+        time_of_day: document.getElementById('newThreadTime').value
     };
     fetch('/api/add_thread', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) }).then(r => r.json()).then(d => { if(d.success) location.reload(); else alert(d.error); });
 }
 
-        function openEditModal(id, name, redacted, subCat, type, cadence, time_of_day) { // ДОДАНО АРГУМЕНТ
+        function openEditModal(id, name, redacted, subCat, type, cadence, time_of_day) {
     document.getElementById('editThreadId').value = id;
     document.getElementById('editThreadName').value = name || '';
     document.getElementById('editThreadRedacted').value = redacted || '';
     document.getElementById('editThreadSubCat').value = subCat || '';
     document.getElementById('editThreadType').value = type || 'perpetual';
     document.getElementById('editThreadCadence').value = cadence || 'daily';
-    document.getElementById('editThreadTime').value = time_of_day || 'unspecified'; // НОВЕ ПОЛЕ
+    document.getElementById('editThreadTime').value = time_of_day || 'unspecified';
     showModalWindow('editThreadModal');
 }
 
@@ -525,14 +565,12 @@ body.edit-mode .label-controls { display: flex !important; }
         sub_category: document.getElementById('editThreadSubCat').value,
         type: document.getElementById('editThreadType').value,
         cadence: document.getElementById('editThreadCadence').value,
-        time_of_day: document.getElementById('editThreadTime').value // НОВЕ ПОЛЕ
+        time_of_day: document.getElementById('editThreadTime').value
     };
     fetch('/api/edit_thread', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) }).then(r => r.json()).then(d => { if(d.success) location.reload(); else alert(d.error); });
 }
-        
+
         function openContextModalFromHeader() {
-            activeCell = null;
-            document.getElementById('ctxSquareNoteWrapper').style.display = 'none';
             showModalWindow('contextModal');
         }
 
@@ -545,40 +583,10 @@ body.edit-mode .label-controls { display: flex !important; }
                 off_routine: document.getElementById('ctxOff').checked,
                 off_reason: document.getElementById('ctxOffReason').value
             };
-            
-            if (activeCell) {
-                const newNote = document.getElementById('ctxSquareNote').value;
-                const currentStatus = activeCell.getAttribute('data-status');
-                updateSquare(activeCell, currentStatus, newNote);
-            }
 
             fetch('/api/update_day_context', {
                 method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
             }).then(() => location.reload()); 
-        }
-
-        function updateSquare(el, status, reason) {
-            el.setAttribute('data-status', status);
-            if (reason && reason.trim() !== "") { 
-                el.setAttribute('data-reason', reason); 
-            } else { 
-                el.removeAttribute('data-reason'); 
-            }
-
-            let newClass = 'habit-cell ';
-            if (status === 'hit') newClass += 'completed ';
-            if (el.classList.contains('is-today')) newClass += 'is-today ';
-            if (el.classList.contains('off-routine')) newClass += 'off-routine ';
-            if (el.classList.contains('past-week')) newClass += 'past-week ';
-            
-            el.className = newClass;
-            
-            updateRowVisuals(el.getAttribute('data-id'), el.getAttribute('data-week'), el.getAttribute('data-cadence'));
-            
-            fetch('/api/toggle_status', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ thread_id: el.getAttribute('data-id'), date: el.getAttribute('data-date'), status: status, miss_reason: reason })
-            });
         }
 
         let activeCell = null;
@@ -591,11 +599,14 @@ body.edit-mode .label-controls { display: flex !important; }
             updateSquare(el, next, currentNote);
         }
         
-        
-function updateSquare(el, status, reason) {
+        function updateSquare(el, status, reason) {
             el.setAttribute('data-status', status);
-            if (status === 'miss' && reason) { el.setAttribute('data-reason', reason); } 
-            else { el.removeAttribute('data-reason'); }
+            
+            if (reason && reason.trim() !== "") { 
+                el.setAttribute('data-reason', reason); 
+            } else { 
+                el.removeAttribute('data-reason'); 
+            }
 
             let newClass = 'habit-cell ';
             if (status === 'hit') newClass += 'completed ';
@@ -640,31 +651,20 @@ function updateSquare(el, status, reason) {
             e.preventDefault(); 
             if (!IS_AUTH) { showModalWindow('loginModal'); return; }
             activeCell = el;
-            const dateStr = el.getAttribute('data-date');
             
             const currentNote = el.getAttribute('data-reason') || "";
-            document.getElementById('ctxSquareNote').value = currentNote;
-            document.getElementById('ctxSquareNoteWrapper').style.display = 'block';
+            document.getElementById('standaloneSquareNote').value = currentNote;
             
-            fetch('/api/get_day_info', {
-                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ date: dateStr })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if(data.success) {
-                    document.getElementById('ctxWork').value = data.work;
-                    document.getElementById('ctxOther').value = data.other;
-                    document.getElementById('ctxProject').value = data.project;
-                    document.getElementById('ctxMeds').checked = data.meds;
-                    document.getElementById('ctxOff').checked = data.off;
-                    document.getElementById('ctxOffReason').value = data.off_reason;
-                    document.getElementById('ctxOffReason').style.display = data.off ? 'block' : 'none';
-                    document.getElementById('ctxComments').value = data.comments || "Немає записів за цей день.";
-                    document.getElementById('contextTitle').innerText = "Day Context: " + dateStr;
-                    
-                    showModalWindow('contextModal');
-                }
-            });
+            showModalWindow('squareNoteModal');
+        }
+
+        function saveSquareNote() {
+            if (activeCell) {
+                const newNote = document.getElementById('standaloneSquareNote').value;
+                const currentStatus = activeCell.getAttribute('data-status');
+                updateSquare(activeCell, currentStatus, newNote);
+            }
+            hideModalWindow('squareNoteModal');
         }
 
         function addTaskAPI() {
@@ -733,7 +733,9 @@ function updateSquare(el, status, reason) {
 
         <div class="right-panel">
             <div class="tracker-header">
-                <h1 class="tracker-title">Habit Tracker</h1>
+                <h1 class="tracker-title">
+                    <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Icon" class="title-icon">
+                    Escape Velocity</h1>
                 <div class="controls">
     {% if is_auth %}
         <div class="toggle-group">
@@ -971,11 +973,6 @@ function updateSquare(el, status, reason) {
         <div class="modal-content">
             <div class="modal-title" id="contextTitle">Day Context</div>
 <div style="text-align: left; margin-bottom: 20px;">
-    
-    <div id="ctxSquareNoteWrapper" style="display: none; padding-bottom: 12px; margin-bottom: 16px; border-bottom: 1px dashed #ddd;">
-        <label class="m-label" style="color: #2196f3;">Square Note</label>
-        <input type="text" id="ctxSquareNote" class="m-input" placeholder="Add note..." style="margin-bottom: 0;">
-    </div>
 
     <label class="m-label">Work Priority</label><input type="text" id="ctxWork" value="{{ ctx.top_work }}" class="m-input">
                 <label class="m-label">Self Priority</label><input type="text" id="ctxOther" value="{{ ctx.top_other }}" class="m-input">
@@ -998,6 +995,20 @@ function updateSquare(el, status, reason) {
             <div class="modal-buttons">
                 <button class="modal-btn cancel" onclick="hideModalWindow('contextModal')">Close</button>
                 <button class="modal-btn black" onclick="saveContext()">Save All</button>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="modal" id="squareNoteModal">
+        <div class="modal-content" style="max-width: 600px; width: 100%;">
+            <div class="modal-title">Square Note</div>
+            <div style="text-align: left; margin-bottom: 20px;">
+                <textarea id="standaloneSquareNote" class="m-input" placeholder="Add your note here..." style="min-height: 250px; resize: vertical; font-family: inherit; font-size: 14px; padding: 12px;"></textarea>
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" onclick="hideModalWindow('squareNoteModal')">Cancel</button>
+                <button class="modal-btn black" onclick="saveSquareNote()">Save Note</button>
             </div>
         </div>
     </div>
