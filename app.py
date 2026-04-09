@@ -466,15 +466,32 @@ def index():
         for c in recent_cals:
             lines = [line for line in c.comments.split('\n') if line.strip()]
             day_comments = []
+            
+            current_comment = None
+            
             for line in lines:
                 if line.startswith('[') and ']' in line:
+                    if current_comment:
+                        day_comments.append(current_comment)
+                    
                     end_bracket = line.find(']')
                     time_str = line[1:end_bracket]
                     text_str = line[end_bracket+1:].strip()
-                    day_comments.append({'date': c.actual_date.strftime('%Y-%m-%d'), 'time': time_str, 'text': text_str})
+                    
+                    current_comment = {
+                        'date': c.actual_date.strftime('%Y-%m-%d'), 
+                        'time': time_str, 
+                        'text': text_str
+                    }
                 else:
-                    day_comments.append({'date': c.actual_date.strftime('%Y-%m-%d'), 'time': '', 'text': line})
+                    if current_comment:
+                        current_comment['text'] += "\n" + line
+                    else:
+                        current_comment = {'date': c.actual_date.strftime('%Y-%m-%d'), 'time': '', 'text': line}
             
+            if current_comment:
+                day_comments.append(current_comment)
+                
             day_comments.reverse()
             global_parsed_comments.extend(day_comments)
             
@@ -499,17 +516,17 @@ def index():
             'week_40k': cal.week_40k
         }
 
-        categories = ['work', 'maintenance', 'family', 'self care']
+        categories = ['work', 'maintenance', 'family', 'quests', 'self care']
         threads = Thread.query.filter(Thread.status == 'active').order_by(Thread.rank.desc()).all()
         grouped_threads = {c: [] for c in categories}
         
         start_of_current_week = today - timedelta(days=today.weekday())
         
-        start_date = start_of_current_week - timedelta(days=21)
+        start_date = start_of_current_week - timedelta(days=35)
         end_date = start_of_current_week + timedelta(days=6)
         
         week_headers = []
-        for i in range(4):
+        for i in range(6):
             w_start = start_date + timedelta(days=i*7)
             _, w_str = get_week_data(w_start)
             week_headers.append(w_str)
@@ -522,7 +539,7 @@ def index():
             cat = th.category if th.category in grouped_threads else 'maintenance'
             days = []
             
-            for i in range(28):
+            for i in range(42):
                 curr = start_date + timedelta(days=i)
                 sq = sq_map.get((th.thread_id, curr))
                 status = sq.status if sq else 'empty'
@@ -651,7 +668,7 @@ def edit_thread():
             db.session.commit()
             return jsonify({'success': True})
             
-        return jsonify({'success': False, 'error': 'Звичку не знайдено'})
+        return jsonify({'success': False, 'error': 'Not found'})
     except Exception as e: 
         return jsonify({'success': False, 'error': str(e)})
 
