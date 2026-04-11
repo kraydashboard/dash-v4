@@ -111,6 +111,14 @@ class BoardItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     text = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.datetime.now)
+
+class IntentEntry(db.Model):
+    __tablename__ = 'intent_entries'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, default=1) 
+    entry_date = db.Column(db.Date, nullable=False)
+    horizon = db.Column(db.String(20))
+    content = db.Column(db.Text)
     
 class PartnerRequest(db.Model):
     __tablename__ = 'partner_requests'
@@ -253,7 +261,13 @@ def create_full_backup_json():
         'chain_start_date': str(c.chain_start_date), 'chain_end_date': str(c.chain_end_date),
         'duration': c.duration, 'end_reason': c.end_reason
     } for c in Chain.query.all()]
+    data['intent_entries'] = [{
+        'entry_date': str(e.entry_date),
+        'horizon': e.horizon,
+        'content': e.content
+    } for e in IntentEntry.query.all()]
     return json.dumps(data, indent=2, ensure_ascii=False)
+    
 
 def restore_from_json(json_content):
     try:
@@ -263,6 +277,7 @@ def restore_from_json(json_content):
         db.session.query(BoardItem).delete()
         db.session.query(Calendar).delete()
         db.session.query(Thread).delete()
+        db.session.query(IntentEntry).delete()
         db.session.commit()
         
         for t in data.get('threads', []):
@@ -289,7 +304,15 @@ def restore_from_json(json_content):
                 chain_end_reason=s.get('chain_end_reason', "")
             )
             db.session.add(sq)
-            
+        
+        for e in data.get('intent_entries', []):
+            d_date = datetime.datetime.strptime(e['entry_date'], '%Y-%m-%d').date()
+            db.session.add(IntentEntry(
+            entry_date=d_date,
+            horizon=e.get('horizon'),
+            content=e.get('content')
+        ))
+
         for c in data.get('calendar', []):
             d_date = datetime.datetime.strptime(c['actual_date'], '%Y-%m-%d').date()
             cal = Calendar(
@@ -728,6 +751,34 @@ if not any(t.name == "RequestBotThread" for t in threading.enumerate()):
     t2 = threading.Thread(target=run_request_bot_thread, name="RequestBotThread")
     t2.daemon = True
     t2.start()
+
+@app.route('/api/calendar/<int:year>/<int:month>', methods=['GET'])
+@login_required
+def get_intent_calendar_data(year, month):
+    start_date = date(year, month + 1, 1)
+    if month == 11:
+        end_date = date(year + 1, 1, 1) - timedelta(days=1)
+    else:
+        end_date = date(year, month + 2, 1) - timedelta(days=1)
+
+    entries = IntentEntry.query.filter(IntentEntry.entry_date >= start_date, IntentEntry.entry_date <= end_date).all()
+    data = {}
+    for e in entries:
+        day = e.entry_date.day
+        if day not in data: data[day] = []
+        data[day].append({"horizon": e.horizon, "text": e.content})
+    return jsonify(data)
+
+@app.route('/api/calendar/save', methods=['POST'])
+@login_required
+def save_intent_calendar_data():
+    req = request.json
+    d_date = datetime.datetime.strptime(req.get('date'), '%Y-%m-%d').date()
+    IntentEntry.query.filter_by(entry_date=d_date).delete()
+    for seg in req.get('segments', []):
+        db.session.add(IntentEntry(entry_date=d_date, horizon=seg.get('horizon'), content=seg.get('text')))
+    db.session.commit()
+    return jsonify({'success': True})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000, debug=False, use_reloader=False)
