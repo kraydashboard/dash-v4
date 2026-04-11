@@ -1068,6 +1068,7 @@ body.edit-mode .label-controls { display: flex !important; }
                     <div class="toggle-group">
                         <button class="tgl-btn sort-tgl active" data-mode="type" onclick="setSortMode('type')">By Type</button>
                         <button class="tgl-btn sort-tgl" data-mode="time" onclick="setSortMode('time')">By Time</button>
+                        <button class="tgl-btn" onclick="window.location.href='{{ url_for('calendar') }}'">Calendar</button>
                     </div>
 
                     {% if is_auth %}
