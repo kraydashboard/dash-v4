@@ -687,6 +687,10 @@ def move_thread():
         thread.rank, neighbor.rank = neighbor.rank, thread.rank
         db.session.commit()
     return jsonify({'success': True})
+@app.route('/calendar')
+@login_required
+def calendar():
+    return render_template('m_page.html')
 
 # --- STARTUP LOGIC ---
 with app.app_context():
