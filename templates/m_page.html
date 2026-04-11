@@ -153,15 +153,37 @@
     }
 
     // Load / Save Data
-    function loadData() {
-        const data = localStorage.getItem(storageKey(viewYear, viewMonth));
-        monthData = data ? JSON.parse(data) : {};
+    async function loadData() {
+        try {
+            const response = await fetch(`/api/calendar/${viewYear}/${viewMonth}`);
+            monthData = response.ok ? await response.json() : {};
+        } catch (e) { monthData = {}; }
         renderAll();
     }
 
-    function saveData() {
-        localStorage.setItem(storageKey(viewYear, viewMonth), JSON.stringify(monthData));
-        renderAll();
+    async function saveDay() {
+        const filtered = editSegments.filter(s => s.text.trim() !== "");
+        const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(editDay).padStart(2, '0')}`;
+        
+        try {
+            const response = await fetch('/api/calendar/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ date: dateStr, segments: filtered })
+            });
+
+            if (response.ok) {
+                if (filtered.length === 0) delete monthData[editDay];
+                else monthData[editDay] = filtered;
+                
+                renderAll();
+                closeEditor();
+            } else {
+                alert("Помилка збереження на сервері");
+            }
+        } catch (e) {
+            console.error("Помилка мережі:", e);
+        }
     }
 
     // Navigation
@@ -316,17 +338,6 @@
                 charCountSpan.style.color = value.length > 120 ? '#f59e0b' : '#ccc';
             }
         }
-    }
-
-    function saveDay() {
-        const filtered = editSegments.filter(s => s.text.trim() !== "");
-        if (filtered.length === 0) {
-            delete monthData[editDay];
-        } else {
-            monthData[editDay] = filtered;
-        }
-        saveData();
-        closeEditor();
     }
 
     function renderModalSegments() {
