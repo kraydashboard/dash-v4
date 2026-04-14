@@ -1,21 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Escape Velocity</title>
+    <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='logo.jpg') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Inter:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
     <style>
         :root {
             --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             --mono: 'DM Mono', monospace;
-            
+
             --ink: #1a1a1a;
             --ink-mid: #888;
             --ink-lt: #bbb;
         }
+
         * {
             margin: 0;
             padding: 0;
@@ -31,48 +36,93 @@
 
         .container {
             display: grid;
-            grid-template-columns: 1fr 5fr;
+            column-gap: 0;
+            grid-template-columns: 1.5fr 5fr;
             min-height: 100vh;
             max-width: 1920px;
             margin: 0 auto;
         }
 
-.toggle-group {
-    display: flex; border: 1px solid #e0e0e0; border-radius: 6px; overflow: hidden; background: #fff; margin-right: 8px;
-}
-.tgl-btn {
-    padding: 6px 12px; background: transparent; border: none; font-size: 12px; font-weight: 500; cursor: pointer; color: #888; transition: all 0.15s; white-space: nowrap;
-}
-.tgl-btn:hover { color: #1a1a1a; background: #f5f5f5; }
-.tgl-btn.active { background: #1a1a1a; color: #fff; }
-.tgl-btn + .tgl-btn { border-left: 1px solid #e0e0e0; }
+        .toggle-group {
+            display: flex;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            overflow: hidden;
+            background: #fff;
+            margin-right: 8px;
+        }
 
-.time-group-header {
-    grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 12px 0 4px 0; border-bottom: 1px solid #e0e0e0;
-}
-.time-group-label {
-    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #888; white-space: nowrap;
-}
+        .tgl-btn {
+            padding: 6px 12px;
+            background: transparent;
+            border: none;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            color: #888;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
 
-/* ── LEFT PANEL ── */
+        .tgl-btn:hover {
+            color: #1a1a1a;
+            background: #f5f5f5;
+        }
+
+        .tgl-btn.active {
+            background: #1a1a1a;
+            color: #fff;
+        }
+
+        .tgl-btn+.tgl-btn {
+            border-left: 1px solid #e0e0e0;
+        }
+
+        .time-group-header {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 0 4px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .time-group-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #888;
+            white-space: nowrap;
+            position: sticky;
+            left: 0;
+            background: #ffffff;
+            padding-left: 20px;
+            padding-right: 12px;
+            z-index: 10;
+        }
+
+        /* ── LEFT PANEL ── */
         .left-panel {
             background: #ffffff;
-            border-right: 1px solid #e0e0e0;
-            padding: 32px 20px;
+            border-right: none;
+            padding: 24px 0 24px 20px;
             display: flex;
             flex-direction: column;
             max-height: 100vh;
         }
 
         .task-log-header {
-            font-size: 13px;
-            font-weight: 600;
-            letter-spacing: 0.8px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
             text-transform: uppercase;
             color: #888;
-            margin-bottom: 20px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid #e0e0e0;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-left: 4px;
         }
 
         .task-log {
@@ -81,32 +131,53 @@
             gap: 0;
             overflow-y: auto;
             flex: 1;
-            padding-right: 4px;
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
         }
 
         .task-entry {
             padding: 10px 0 10px 12px;
-            border-left: 2px solid #e0e0e0;
+            border-left: 2px solid #f0f0f0;
             font-size: 12px;
             line-height: 1.5;
             color: #1a1a1a;
-            transition: border-color 0.15s;
+            transition: all 0.15s;
         }
-        .task-entry + .task-entry { margin-top: 2px; }
-        .task-entry:hover { border-left-color: #888; }
-        .task-text { margin-bottom: 3px; }
+
+        .task-entry {
+            padding: 10px 0 10px 12px;
+            border-left: 2px solid #f5f5f5;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #1a1a1a;
+            transition: all 0.15s;
+        }
+
+        .task-entry:hover {
+            border-left-color: #1a1a1a;
+            background: #fafafa;
+        }
+
+        .task-text {
+            margin-bottom: 3px;
+        }
+
         .task-timestamp {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--ink-lt);
-    font-weight: 400;
-}
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--ink-lt);
+            font-weight: 400;
+        }
 
         .task-input-section {
-            margin-top: 20px;
-            padding-top: 16px;
-            border-top: 1px solid #e0e0e0;
+            margin-top: 16px;
+            padding: 0;
+            border-top: none;
         }
+
         .task-input {
             width: 100%;
             padding: 9px 11px;
@@ -120,15 +191,29 @@
             margin-bottom: 8px;
             color: #1a1a1a;
         }
-        .task-input:focus { outline: none; border-color: #888; background: #fff; }
-        .add-task-btn {
-            width: 100%; padding: 9px;
-            background: #1a1a1a; color: white;
-            border: none; border-radius: 6px;
-            font-size: 12px; font-weight: 500;
-            cursor: pointer; transition: background 0.2s;
+
+        .task-input:focus {
+            outline: none;
+            border-color: #888;
+            background: #fff;
         }
-        .add-task-btn:hover  { background: #444; }
+
+        .add-task-btn {
+            width: 100%;
+            padding: 9px;
+            background: #1a1a1a;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .add-task-btn:hover {
+            background: #444;
+        }
 
         /* RIGHT PANEL - Escape Velocity */
         .right-panel {
@@ -146,24 +231,25 @@
         }
 
         .tracker-title {
-    font-size: 22px;
-    font-weight: 600;
-    letter-spacing: -0.4px;
-}
-.tracker-title {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: 22px;
-    font-weight: 600;
-    letter-spacing: -0.4px;
-}
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: -0.4px;
+        }
 
-.title-icon {
-    width: 32px;
-    height: 32px;
-    object-fit: contain;
-}
+        .tracker-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: -0.4px;
+        }
+
+        .title-icon {
+            width: 32px;
+            height: 32px;
+            object-fit: contain;
+        }
 
         .controls {
             display: flex;
@@ -194,7 +280,7 @@
             border-color: #d32f2f;
         }
 
-    .edit-toggle {
+        .edit-toggle {
             display: flex;
             align-items: center;
             justify-content: center;
@@ -212,157 +298,234 @@
             white-space: nowrap;
         }
 
-.edit-toggle:hover { color: #1a1a1a; background: #f5f5f5; }
-.edit-toggle.on { background: #fff8e1; border-color: #f0c040; color: #b45000; }
+        .edit-toggle:hover {
+            color: #1a1a1a;
+            background: #f5f5f5;
+        }
 
-.edit-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: #e0e0e0; flex-shrink: 0; transition: background 0.2s;
-}
-.edit-toggle.on .edit-dot { background: #f0a020; }
+        .edit-toggle.on {
+            background: #fff8e1;
+            border-color: #f0c040;
+            color: #b45000;
+        }
 
-.cat-add-btn, .label-controls { 
-    display: none !important; 
-}
+        .edit-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            flex-shrink: 0;
+            transition: background 0.2s;
+        }
 
-body.edit-mode .cat-add-btn { display: inline-block !important; }
-body.edit-mode .label-controls { display: flex !important; }
+        .edit-toggle.on .edit-dot {
+            background: #f0a020;
+        }
+
+        .cat-add-btn,
+        .label-controls {
+            display: none !important;
+        }
+
+        body.edit-mode .cat-add-btn {
+            display: inline-block !important;
+        }
+
+        body.edit-mode .label-controls {
+            display: flex !important;
+        }
 
         .mobile-only {
             display: none;
         }
 
-.grid-wrapper {
-    background: #ffffff;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    padding: 16px 20px 28px 20px;
-    margin-top: 16px;
-    overflow-x: auto;
-}
+        .grid-wrapper {
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 16px 20px 28px 0;
+            margin-top: 16px;
+            overflow-x: auto;
+        }
 
-.grid-container {
-    display: grid;
-    /*grid-template-columns: max-content repeat(52, 14px 14px 14px 14px 14px 14px 14px 3px);*/
-    column-gap: 2px;
-    row-gap: 0;
-    justify-content: start;
-    align-items: center;
-    font-size: 11px;
-}
+        .grid-container {
+            display: grid;
+            column-gap: 2px;
+            row-gap: 0;
+            justify-content: start;
+            align-items: center;
+            font-size: 11px;
+        }
 
-.month-band, .week-band {
-    grid-row-start: auto;
-    position: relative;
-    display: flex; 
-    align-items: center;
-    justify-content: center;
-    padding: 4px 0;
-    min-width: 0;
-}
+        .month-band,
+        .week-band {
+            grid-row-start: auto;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px 0;
+            min-width: 0;
+        }
 
-.month-band { grid-row: 1; margin-top: 8px; }
-.week-band { grid-row: 2; }
+        .month-band {
+            grid-row: 1;
+            margin-top: 8px;
+        }
 
-.month-band-line, .week-band-line {
-    position: absolute; top: 50%; left: 0; right: 0;
-    height: 1px; background: #e8e6e0;
-    z-index: 0;
-}
+        .week-band {
+            grid-row: 2;
+        }
 
-.month-band-label, .week-band-label {
-    position: relative; z-index: 1;
-    background: #fafafa;
-    padding: 0 10px;
-    font-size: 11px; font-weight: 600; color: #888;
-    white-space: nowrap;
-}
+        .month-band-line,
+        .week-band-line {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #e8e6e0;
+            z-index: 0;
+        }
 
-.week-band-label { 
-    font-family: var(--mono); font-size: 9px; color: #bbb; 
-}
-.day-date { grid-row: 3; text-align: center; font-family: var(--mono); font-size: 9px; font-weight: 500; color: #888; }
-.day-letter { 
-    grid-row: 4; 
-    text-align: center; 
-    font-family: var(--mono); 
-    font-size: 9px; 
-    font-weight: 300; 
-    color: #d4d0c8; 
-    padding-bottom: 0px;
-}
+        .month-band-label,
+        .week-band-label {
+            position: relative;
+            z-index: 1;
+            background: #ffffff;
+            padding: 0 10px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #888;
+            white-space: nowrap;
+        }
 
-.category-header {
-    grid-column: 1 / -1;
-    font-weight: 700;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding: 3px 0 3px 0;
-    margin-top: 0;
-    border-bottom: 1px solid #e0e0e0;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-.week-header {
-    grid-row: 1;
-    text-align: center;
-    font-family: var(--sans);
-    font-weight: 600;
-    padding: 8px 0;
-    font-size: 13px;
-    color: var(--ink-mid);
-}
+        .week-band-label {
+            font-family: var(--mono);
+            font-size: 9px;
+            color: #bbb;
+        }
 
-.day-number {
-    grid-row: 2;
-    text-align: center;
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--ink-lt);
-    padding: 4px 0 8px 0;
-}
+        .day-date {
+            grid-row: 3;
+            text-align: center;
+            font-family: var(--mono);
+            font-size: 9px;
+            font-weight: 500;
+            color: #888;
+        }
 
-        .cat-add-btn { 
-    display: none;
-    cursor: pointer; 
-    font-size: 12px;
-    font-weight: 400; 
-    color: #bbb;
-    background: none;
-    border: none;
-    padding: 0;
-    line-height: 1;
-    transition: color 0.15s;
-    position: relative;
-    z-index: 10;
-}
+        .day-letter {
+            grid-row: 4;
+            text-align: center;
+            font-family: var(--mono);
+            font-size: 9px;
+            font-weight: 300;
+            color: #d4d0c8;
+            padding-bottom: 0px;
+        }
+
+        .category-header {
+            grid-column: 1 / -1;
+            font-weight: 700;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 3px 0 3px 0;
+            margin-top: 0;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .category-header span {
+            position: sticky;
+            left: 0;
+            background: #ffffff;
+            padding-left: 20px;
+            padding-right: 12px;
+            z-index: 10;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .week-header {
+            grid-row: 1;
+            text-align: center;
+            font-family: var(--sans);
+            font-weight: 600;
+            padding: 8px 0;
+            font-size: 13px;
+            color: var(--ink-mid);
+        }
+
+        .day-number {
+            grid-row: 2;
+            text-align: center;
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--ink-lt);
+            padding: 4px 0 8px 0;
+        }
+
+        .cat-add-btn {
+            display: none;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 400;
+            color: #bbb;
+            background: none;
+            border: none;
+            padding: 0;
+            line-height: 1;
+            transition: color 0.15s;
+            position: relative;
+            z-index: 10;
+        }
 
         .cat-add-btn:hover {
             color: #1a1a1a;
         }
-        
+
 
         .habit-label {
             grid-column: 1;
-            padding: 0px 6px 0px 0;
+            position: sticky;
+            left: 0;
+            background: #ffffff;
+            z-index: 10;
+            padding: 0px 6px 0px 20px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             font-size: 12px;
-            min-height: 16px;
+            min-height: 20px;
             gap: 6px;
         }
-.label-controls { 
-    display: none;
-    gap: 4px; 
-    flex-shrink: 0;
-}
 
-        .l-btn { background: none; border: none; font-size: 10px; cursor: pointer; color: #999; }
-        .l-btn:hover { color: #1a1a1a; }
-        .l-btn.red:hover { color: #d32f2f; }
+        .label-controls {
+            display: none;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+
+        .l-btn {
+            background: none;
+            border: none;
+            font-size: 10px;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .l-btn:hover {
+            color: #1a1a1a;
+        }
+
+        .l-btn.red:hover {
+            color: #d32f2f;
+        }
 
         .habit-cell {
             width: 14px;
@@ -375,104 +538,213 @@ body.edit-mode .label-controls { display: flex !important; }
 
         .habit-cell:hover {
             transform: scale(1.1);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
             z-index: 5;
         }
 
-        .habit-cell.completed { background: #1a1a1a; }
-        .habit-cell.completed.past-week { background: #8a9097; border-color: #8a9097; }
-        
-.habit-cell.miss { 
-    background: repeating-linear-gradient(
-        45deg,
-        #1a1a1a,
-        #1a1a1a 2px,
-        #ffffff 2px,
-        #ffffff 4px
-    );
-    border-color: #1a1a1a;
-    opacity: 0.8;
-}
-        .habit-cell.is-today { border: 2px solid #2196f3 !important; transform: scale(1.1); }
-        .habit-cell.padding { border: none; pointer-events: none; opacity: 0; }
-        .habit-cell.fulfilled { background: #f0f0f0; border: 1px solid #ddd; }
-        .habit-cell.off-routine { border: 1px dashed #999; opacity: 0.5; }
+        .habit-cell.completed {
+            background: #1a1a1a;
+        }
+
+        .habit-cell.completed.past-week {
+            background: #8a9097;
+            border-color: #8a9097;
+        }
+
+        .habit-cell.miss {
+            background: repeating-linear-gradient(45deg,
+                    #1a1a1a,
+                    #1a1a1a 2px,
+                    #ffffff 2px,
+                    #ffffff 4px);
+            border-color: #1a1a1a;
+            opacity: 0.8;
+        }
+
+        .habit-cell.is-today {
+            border: 2px solid #2196f3 !important;
+            transform: scale(1.1);
+        }
+
+        .habit-cell.padding {
+            border: none;
+            pointer-events: none;
+            opacity: 0;
+        }
+
+        .habit-cell.fulfilled {
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+        }
+
+        .habit-cell.off-routine {
+            border: 1px dashed #999;
+            opacity: 0.5;
+        }
 
         .habit-cell[data-reason]:hover::after {
             content: attr(data-reason);
-            position: absolute; bottom: 130%; left: 50%; transform: translateX(-50%);
-            background: rgba(0,0,0,0.85); color: #fff; padding: 4px 8px; border-radius: 4px;
-            font-size: 11px; white-space: nowrap; z-index: 999; pointer-events: none;
+            position: absolute;
+            bottom: 130%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            white-space: nowrap;
+            z-index: 999;
+            pointer-events: none;
         }
 
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: #f1f1f1; }
-        ::-webkit-scrollbar-thumb { background: #c0c0c0; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #a0a0a0; }
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #c0c0c0;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a0a0a0;
+        }
 
         .modal {
             display: none;
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
         }
 
-        .modal.active { display: flex; }
+        .modal.active {
+            display: flex;
+        }
 
         .modal-content {
-            background: white; padding: 32px; border-radius: 12px; max-width: 400px; text-align: center;
+            background: white;
+            padding: 32px;
+            border-radius: 12px;
+            max-width: 400px;
+            text-align: center;
         }
 
-        .modal-title { font-size: 20px; font-weight: 600; margin-bottom: 12px; }
-        .modal-text { font-size: 14px; color: #666; margin-bottom: 24px; line-height: 1.5; }
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
 
-        .modal-buttons { display: flex; gap: 12px; justify-content: center; }
+        .modal-text {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
 
         .modal-btn {
-            padding: 10px 24px; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s;
+            padding: 10px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
         }
-        .modal-btn.cancel { background: #f5f5f5; color: #1a1a1a; }
-        .modal-btn.cancel:hover { background: #e8e8e8; }
-        .modal-btn.confirm { background: #d32f2f; color: white; }
-        .modal-btn.confirm:hover { background: #b71c1c; }
-        .modal-btn.black { background: #1a1a1a; color: white; }
-        .modal-btn.black:hover { background: #333; }
-        
+
+        .modal-btn.cancel {
+            background: #f5f5f5;
+            color: #1a1a1a;
+        }
+
+        .modal-btn.cancel:hover {
+            background: #e8e8e8;
+        }
+
+        .modal-btn.confirm {
+            background: #d32f2f;
+            color: white;
+        }
+
+        .modal-btn.confirm:hover {
+            background: #b71c1c;
+        }
+
+        .modal-btn.black {
+            background: #1a1a1a;
+            color: white;
+        }
+
+        .modal-btn.black:hover {
+            background: #333;
+        }
+
         .m-input {
-            width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #ddd; border-radius: 6px; font-family: inherit; font-size: 13px;
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 13px;
         }
-        .m-label { display: block; text-align: left; font-size: 12px; color: #666; margin-bottom: 4px; font-weight: 600; }
-        
+
+        .m-label {
+            display: block;
+            text-align: left;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+
         .habit-cell[data-reason]:not(.completed):not(.miss) {
             background: #e3f2fd;
             border-color: #90caf9;
         }
 
-        .habit-cell.completed[data-reason] { 
-            background: #153e75; 
-            border-color: #153e75; 
+        .habit-cell.completed[data-reason] {
+            background: #153e75;
+            border-color: #153e75;
         }
 
-        .habit-cell.completed.past-week[data-reason] { 
-            background: #547fb0; 
-            border-color: #547fb0; 
+        .habit-cell.completed.past-week[data-reason] {
+            background: #547fb0;
+            border-color: #547fb0;
         }
-        
-        .habit-cell.miss[data-reason] { 
-            background: repeating-linear-gradient(
-                45deg,
-                #153e75,
-                #153e75 2px,
-                #ffffff 2px,
-                #ffffff 4px
-            );
+
+        .habit-cell.miss[data-reason] {
+            background: repeating-linear-gradient(45deg,
+                    #153e75,
+                    #153e75 2px,
+                    #ffffff 2px,
+                    #ffffff 4px);
             border-color: #153e75;
         }
 
         .action-buttons {
-    display: flex;
-    /*align-items: center;*/
-    gap: 12px;
-}
+            display: flex;
+            /*align-items: center;*/
+            gap: 12px;
+        }
 
         .mobile-menu-btn {
             display: none;
@@ -483,6 +755,20 @@ body.edit-mode .label-controls { display: flex !important; }
         }
 
         @media (max-width: 768px) {
+
+            .right-panel {
+                order: 1 !important;
+            }
+
+            .grid-wrapper,
+            #calendarView {
+                order: 2 !important;
+            }
+
+            .left-panel {
+                order: 3 !important;
+            }
+
             .container {
                 display: flex;
                 flex-direction: column;
@@ -493,6 +779,7 @@ body.edit-mode .label-controls { display: flex !important; }
             .desktop-only {
                 display: none !important;
             }
+
             .mobile-only {
                 display: block !important;
                 padding: 12px 16px 20px 16px;
@@ -500,44 +787,57 @@ body.edit-mode .label-controls { display: flex !important; }
                 overflow: hidden;
             }
 
-            .mobile-only .week-band { grid-row: 1; margin-top: 0; }
-            .mobile-only .day-date { grid-row: 2; }
-            .mobile-only .day-letter { grid-row: 3; padding-bottom: 0px; }
+            .mobile-only .week-band {
+                grid-row: 1;
+                margin-top: 0;
+            }
+
+            .mobile-only .day-date {
+                grid-row: 2;
+            }
+
+            .mobile-only .day-letter {
+                grid-row: 3;
+                padding-bottom: 0px;
+            }
+
             .mobile-only .time-header {
                 margin-top: 0 !important;
                 padding-top: 4px;
             }
 
             .action-buttons {
-        display: none;
-        flex-direction: column;
-        align-items: stretch;
-        gap: 8px;
-    }
+                display: none;
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+            }
 
-    .action-buttons.show {
-        display: flex;
-    }
+            .action-buttons.show {
+                display: flex;
+            }
 
-    
-    .action-buttons .edit-toggle {
-        border: none;
-        padding: 10px 8px;
-        width: 100%;
-        background: transparent;
-        justify-content: flex-start;
-    }
 
-    .action-buttons .edit-toggle.on {
-        background: #fff8e1;
-        border-radius: 4px;
-    }
+            .action-buttons .edit-toggle {
+                border: none;
+                padding: 10px 8px;
+                width: 100%;
+                background: transparent;
+                justify-content: flex-start;
+            }
+
+            .action-buttons .edit-toggle.on {
+                background: #fff8e1;
+                border-radius: 4px;
+            }
 
             .left-panel {
-                border-right: none;
-                border-top: 2px solid #1a1a1a;
-                padding: 24px 16px;
-                order: 2;
+                background: #ffffff;
+                border-right: 1px solid #e0e0e0;
+                padding: 24px 20px;
+                display: flex;
+                flex-direction: column;
+                max-height: 100vh;
             }
 
             .right-panel {
@@ -566,7 +866,7 @@ body.edit-mode .label-controls { display: flex !important; }
 
             .controls {
                 width: 100%;
-                flex-wrap: wrap; 
+                flex-wrap: wrap;
                 gap: 8px;
             }
 
@@ -575,28 +875,28 @@ body.edit-mode .label-controls { display: flex !important; }
                 align-items: center;
                 justify-content: center;
                 padding: 0;
-                width: 40px; 
+                width: 40px;
                 height: 40px;
                 font-weight: 700;
                 font-size: 22px;
                 border: 1px solid #ddd;
                 border-radius: 6px;
                 background: #fff;
-                position: absolute; 
-                top: -4px; 
-                right: 0; 
+                position: absolute;
+                top: -4px;
+                right: 0;
             }
 
             .action-buttons {
                 display: none;
                 position: absolute;
-                top: 44px; 
+                top: 44px;
                 right: 0;
                 background: white;
                 border: 1px solid #e0e0e0;
                 border-radius: 8px;
                 padding: 8px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
                 flex-direction: column;
                 gap: 4px;
                 z-index: 1000;
@@ -629,7 +929,8 @@ body.edit-mode .label-controls { display: flex !important; }
                 background: #f5f5f5;
             }
 
-            .control-btn, .edit-toggle {
+            .control-btn,
+            .edit-toggle {
                 flex: 1 1 auto;
                 text-align: center;
                 justify-content: center;
@@ -671,6 +972,7 @@ body.edit-mode .label-controls { display: flex !important; }
                 margin: 0 16px;
                 width: 100%;
             }
+
             .modal-buttons {
                 flex-direction: column;
                 gap: 8px;
@@ -695,30 +997,31 @@ body.edit-mode .label-controls { display: flex !important; }
                 color: #fff;
                 position: absolute;
                 top: -4px;
-                right: 48px; 
+                right: 48px;
                 z-index: 10;
                 transition: right 0.2s ease
             }
 
             .left-panel {
-                display: none; 
+                display: none;
                 padding: 0;
                 border: none;
             }
 
             body.show-log-view .left-panel {
                 display: flex;
-                margin-top: 16px;
+                margin-top: 0;
             }
-            
+
             body.show-log-view .grid-wrapper,
             body.show-log-view .controls {
                 display: none !important;
             }
+
             body.show-log-view .mobile-view-toggle {
                 right: 0 !important;
             }
-            
+
             body.edit-mode .mobile-only .habit-cell,
             body.edit-mode .mobile-only .week-band,
             body.edit-mode .mobile-only .day-date,
@@ -727,21 +1030,21 @@ body.edit-mode .label-controls { display: flex !important; }
             }
 
             body.edit-mode .mobile-only .grid-container {
-                grid-template-columns: 1fr !important; 
-                row-gap: 0; 
+                grid-template-columns: 1fr !important;
+                row-gap: 0;
             }
 
             body.edit-mode .mobile-only .habit-label {
                 padding: 6px 0;
-                border-bottom: 1px solid #f0f0f0; 
-                min-height: auto; 
+                border-bottom: 1px solid #f0f0f0;
+                min-height: auto;
             }
 
             body.edit-mode .mobile-only .l-btn {
-                font-size: 10px; 
-                padding: 2px 6px; 
-                background: transparent; 
-                border: none; 
+                font-size: 10px;
+                padding: 2px 6px;
+                background: transparent;
+                border: none;
                 margin-left: 0;
                 color: #bbb;
             }
@@ -751,6 +1054,419 @@ body.edit-mode .label-controls { display: flex !important; }
                 background: transparent;
                 border: none;
             }
+
+            .cal-container {
+                padding: 10px 5px !important;
+            }
+
+            .cal-day-number {
+                font-size: 26px !important;
+                top: 2px !important;
+                left: 2px !important;
+                transform: none !important;
+            }
+
+            .cal-day-cell {
+                min-height: 50px !important;
+                padding: 2px !important;
+                display: block !important;
+            }
+
+            .cal-day-preview {
+                display: none;
+            }
+
+            .cal-day-header {
+                display: block;
+            }
+
+            .cal-dot {
+                width: 6px;
+                height: 6px;
+            }
+
+            .cal-legend {
+                gap: 8px;
+                justify-content: center;
+            }
+
+            .cal-day-cell.is-today {
+                border-width: 1.5px !important;
+            }
+        }
+
+        /* --- CALENDAR STYLES --- */
+        .cal-container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 20px 0;
+            box-sizing: border-box;
+        }
+
+        .cal-header {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            margin-bottom: 6px;
+        }
+
+        .cal-nav-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            color: #999;
+            padding: 0 2px;
+        }
+
+        .cal-nav-btn:hover {
+            color: #333;
+        }
+
+        .cal-month-title {
+            font-size: 18px;
+            font-weight: 500;
+            color: #111;
+            letter-spacing: -0.3px;
+        }
+
+        .cal-year-title {
+            font-size: 14px;
+            color: #999;
+        }
+
+        .cal-today-btn {
+            font-size: 11px;
+            margin-left: 6px;
+            cursor: pointer;
+            border: 1px solid #ddd;
+            background: #fafafa;
+            border-radius: 4px;
+            padding: 2px 6px;
+        }
+
+        .cal-logged-count {
+            margin-left: auto;
+            font-size: 11px;
+            color: #bbb;
+        }
+
+        .cal-legend {
+            display: flex;
+            gap: 14px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+
+        .cal-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            color: #999;
+        }
+
+        .cal-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .cal-stats-bar {
+            display: flex;
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 16px 0;
+            background: #eeeeee;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .cal-stats-segment {
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+
+        .cal-dow-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 3px;
+            margin-bottom: 3px;
+        }
+
+        .cal-dow-item {
+            font-size: 10px;
+            color: #bbb;
+            text-align: center;
+            padding: 2px 0;
+        }
+
+        .cal-calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 3px;
+        }
+
+        .cal-day-cell {
+            min-height: 108px;
+            background: #fafafa;
+            border: 1px solid #ebebeb;
+            border-radius: 3px;
+            padding: 5px 6px;
+            cursor: pointer;
+            box-sizing: border-box;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            transition: background 0.1s;
+        }
+
+        .cal-day-cell:hover {
+            background: #f5f5f5;
+        }
+
+        .cal-day-cell.is-today {
+            background: #fffcfc;
+            border: 2px solid #d32f2f !important;
+            position: relative;
+            z-index: 2;
+            box-shadow: inset 0 0 4px rgba(211, 47, 47, 0.1);
+        }
+
+        .cal-day-cell.is-today.colored-cell {
+            border: 2px solid #d32f2f !important;
+        }
+
+        .cal-day-cell.is-future {
+            opacity: 0.38;
+        }
+
+        .cal-day-cell {
+            position: relative;
+            min-height: 108px;
+            background: #fafafa;
+            border: 1px solid #ebebeb;
+            border-radius: 3px;
+            padding: 5px 6px;
+            cursor: pointer;
+            box-sizing: border-box;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            transition: background 0.1s;
+        }
+
+        .cal-day-header {
+            display: block;
+        }
+
+        .cal-day-number {
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            font-size: 42px;
+            font-weight: 700;
+            letter-spacing: -2px;
+            color: rgba(0, 0, 0, 0.05);
+            z-index: 0;
+            pointer-events: none;
+            line-height: 0.8;
+            margin: 0;
+            transition: color 0.1s;
+        }
+
+        .cal-day-preview {
+            font-size: 10.5px;
+            color: #444;
+            line-height: 1.45;
+            word-break: break-word;
+            overflow: hidden;
+            position: relative;
+            z-index: 1;
+            padding-top: 2px;
+        }
+
+        .cal-modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .cal-modal-content {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px 22px;
+            width: 420px;
+            max-width: 92vw;
+            box-sizing: border-box;
+            max-height: 90vh;
+            overflow-y: auto;
+            text-align: left;
+        }
+
+        .cal-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .cal-modal-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #222;
+        }
+
+        .cal-close-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 20px;
+            color: #aaa;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .cal-segment {
+            margin-bottom: 14px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .cal-segment:last-child {
+            border-bottom: none;
+        }
+
+        .cal-horizon-selector {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            margin-bottom: 8px;
+        }
+
+        .cal-h-btn {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            cursor: pointer;
+            flex-shrink: 0;
+            background: #f0f0f0;
+            border: 1.5px solid #ddd;
+            padding: 0;
+            transition: all 0.1s;
+        }
+
+        .cal-h-label {
+            font-size: 11px;
+            color: #999;
+            margin-left: 3px;
+        }
+
+        .cal-textarea-wrapper {
+            position: relative;
+        }
+
+        .cal-textarea {
+            width: 100%;
+            resize: vertical;
+            font-family: inherit;
+            font-size: 12px;
+            color: #333;
+            background: #fafafa;
+            border: 1px solid #e8e8e8;
+            border-radius: 6px;
+            padding: 7px 8px;
+            box-sizing: border-box;
+            outline: none;
+            line-height: 1.5;
+            min-height: 60px;
+        }
+
+        .cal-char-count {
+            position: absolute;
+            bottom: 6px;
+            right: 8px;
+            font-size: 10px;
+            color: #ccc;
+        }
+
+        .cal-modal-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .cal-day-cell.colored-cell .cal-day-number {
+            color: rgba(255, 255, 255, 0.18) !important;
+            text-shadow: none;
+        }
+
+        .cal-day-cell.colored-cell .cal-day-number {
+            color: #fff;
+            font-weight: 600;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+
+        .cal-day-cell.colored-cell .cal-day-preview {
+            color: rgba(255, 255, 255, 0.95);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .cal-day-cell.colored-cell:hover {
+            filter: brightness(0.9);
+        }
+
+        .grid-corner-nav {
+            grid-column: 1;
+            grid-row: 1 / span 4;
+            align-self: stretch;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 6px;
+            padding-left: 20px;
+            padding-right: 16px;
+            background: #ffffff;
+            position: sticky;
+            left: 0;
+            z-index: 20;
+            border-bottom: 1px solid transparent;
+        }
+
+        .grid-nav-btn {
+            background: #fafafa;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #888;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .grid-nav-btn:hover {
+            background: #f0f0f0;
+            color: #1a1a1a;
+            border-color: #ccc;
+        }
+
+        .habit-label {
+            position: sticky;
+            left: 0;
+            background: #ffffff;
+            z-index: 10;
         }
     </style>
 
@@ -764,10 +1480,10 @@ body.edit-mode .label-controls { display: flex !important; }
 
         function hideMobileMenu() {
             const menu = document.getElementById('actionButtons');
-            if(menu) menu.classList.remove('show');
+            if (menu) menu.classList.remove('show');
         }
 
-        document.addEventListener('click', function(event) {
+        document.addEventListener('click', function (event) {
             const menu = document.getElementById('actionButtons');
             const btn = document.querySelector('.mobile-menu-btn');
             if (menu && menu.classList.contains('show') && !menu.contains(event.target) && !btn.contains(event.target)) {
@@ -778,113 +1494,147 @@ body.edit-mode .label-controls { display: flex !important; }
         function submitAuth() {
             const pwd = document.getElementById('authPassword').value;
             fetch('/api/login', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ password: pwd })
             }).then(r => r.json()).then(d => {
-                if(d.success) location.reload();
+                if (d.success) location.reload();
                 else document.getElementById('loginError').style.display = 'block';
             });
         }
 
         function setSortMode(mode) {
-    localStorage.setItem('habitSortMode', mode);
-    document.querySelectorAll('.sort-tgl').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+            if (mode === 'calendar' && !IS_AUTH) {
+                showModalWindow('loginModal');
+                return;
+            }
 
-    const typeHeaders = document.querySelectorAll('.type-header');
-    const timeHeaders = document.querySelectorAll('.time-header');
-    const labels = document.querySelectorAll('.habit-label');
-    const cells = document.querySelectorAll('.habit-cell');
+            localStorage.setItem('habitSortMode', mode);
 
-    const typeMap = {'work': 10000, 'maintenance': 20000, 'family': 30000, 'quests': 35000, 'self care': 40000};
-    const timeMap = {'morning': 10000, 'midday': 20000, 'evening': 30000, 'night': 40000, 'unspecified': 50000};
+            document.querySelectorAll('.sort-tgl').forEach(b => {
+                b.classList.toggle('active', b.dataset.mode === mode);
+            });
 
-    if (mode === 'type') {
-        typeHeaders.forEach(h => { h.style.display = 'flex'; h.style.order = typeMap[h.dataset.cat] || 90000; });
-        timeHeaders.forEach(h => h.style.display = 'none');
+            const calendarView = document.getElementById('calendarView');
+            if (mode === 'calendar') {
+                document.querySelectorAll('.grid-wrapper').forEach(w => {
+                    if (w.id !== 'calendarView') w.style.setProperty('display', 'none', 'important');
+                });
+                if (calendarView) {
+                    calendarView.style.display = 'block';
+                    if (!window.calDataLoaded) { loadCalData(); window.calDataLoaded = true; }
+                }
+            } else {
+                if (calendarView) calendarView.style.display = 'none';
+                const isMobile = window.innerWidth <= 768;
+                document.querySelectorAll('.grid-wrapper').forEach(w => {
+                    if (w.id === 'calendarView') return;
+                    w.style.display = (isMobile && w.classList.contains('mobile-only')) || (!isMobile && w.classList.contains('desktop-only')) ? 'block' : 'none';
+                });
 
-        labels.forEach(l => { l.style.order = (typeMap[l.dataset.cat] || 90000) + parseInt(l.dataset.idx); });
-        cells.forEach(c => { c.style.order = (typeMap[c.dataset.cat] || 90000) + parseInt(c.dataset.idx); });
-    } else {
-        typeHeaders.forEach(h => h.style.display = 'none');
-        timeHeaders.forEach(h => { h.style.display = 'flex'; h.style.order = timeMap[h.dataset.time] || 90000; });
+                const typeHeaders = document.querySelectorAll('.type-header');
+                const timeHeaders = document.querySelectorAll('.time-header');
+                const labels = document.querySelectorAll('.habit-label');
+                const cells = document.querySelectorAll('.habit-cell');
 
-        labels.forEach(l => { l.style.order = (timeMap[l.dataset.time] || 50000) + parseInt(l.dataset.idx); });
-        cells.forEach(c => { c.style.order = (timeMap[c.dataset.time] || 50000) + parseInt(c.dataset.idx); });
-    }
-}
+                const typeMap = { 'work': 10000, 'maintenance': 20000, 'family': 30000, 'quests': 35000, 'self care': 40000 };
+                const timeMap = { 'morning': 10000, 'midday': 20000, 'evening': 30000, 'night': 40000, 'unspecified': 50000 };
+
+                if (mode === 'type') {
+                    typeHeaders.forEach(h => { h.style.display = 'flex'; h.style.order = typeMap[h.dataset.cat] || 90000; });
+                    timeHeaders.forEach(h => h.style.display = 'none');
+                    labels.forEach(l => { l.style.order = (typeMap[l.dataset.cat] || 90000) + (1000 - parseInt(l.dataset.rank)); });
+                    cells.forEach(c => { c.style.order = (typeMap[c.dataset.cat] || 90000) + (1000 - parseInt(c.dataset.rank)); });
+                } else {
+                    typeHeaders.forEach(h => h.style.display = 'none');
+                    timeHeaders.forEach(h => { h.style.display = 'flex'; h.style.order = timeMap[h.dataset.time] || 90000; });
+                    labels.forEach(l => { l.style.order = (timeMap[l.dataset.time] || 50000) + (1000 - parseInt(l.dataset.rank)); });
+                    cells.forEach(c => { c.style.order = (timeMap[c.dataset.time] || 50000) + (1000 - parseInt(c.dataset.rank)); });
+                }
+            }
+        }
 
         function toggleEditMode() {
             document.body.classList.toggle('edit-mode');
             const isOn = document.body.classList.contains('edit-mode');
-            
+
             localStorage.setItem('habitEditMode', isOn);
-            
+
             const btn = document.getElementById('editToggleBtn');
             if (btn) {
                 btn.classList.toggle('on', isOn);
                 const label = btn.querySelector('.edit-label');
-                if(label) label.textContent = isOn ? 'Edit: ON' : 'Edit: OFF';
+                if (label) label.textContent = isOn ? 'Edit: ON' : 'Edit: OFF';
             }
         }
 
         function logoutAuth() {
-            fetch('/api/logout', {method: 'POST'}).then(() => location.reload());
+            fetch('/api/logout', { method: 'POST' }).then(() => location.reload());
         }
         function showModalWindow(id) { document.getElementById(id).classList.add('active'); }
         function hideModalWindow(id) { document.getElementById(id).classList.remove('active'); }
 
         function deleteThread(id, name) {
-            if(confirm("Archive: " + name + "?")) {
-                fetch('/api/delete_thread', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ id: id }) }).then(() => location.reload());
+            if (confirm("Archive: " + name + "?")) {
+                fetch('/api/delete_thread', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) }).then(() => location.reload());
             }
         }
         function moveThread(id, direction) {
-            fetch('/api/move_thread', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ id: id, direction: direction }) }).then(() => location.reload());
+            const mode = localStorage.getItem('habitSortMode') || 'type';
+
+            fetch('/api/move_thread', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: id,
+                    direction: direction,
+                    mode: mode
+                })
+            }).then(() => location.reload());
         }
-        
+
         let currentCat = '';
         function openAddModal(cat) {
             currentCat = cat;
             document.getElementById('catNameDisplay').innerText = cat;
             showModalWindow('addThreadModal');
         }
-        
+
         function submitNewThread() {
-    const payload = {
-        name: document.getElementById('newThreadName').value,
-        category: currentCat,
-        redacted: document.getElementById('newThreadRedacted').value,
-        sub_category: document.getElementById('newThreadSubCat').value,
-        type: document.getElementById('newThreadType').value,
-        cadence: document.getElementById('newThreadCadence').value,
-        time_of_day: document.getElementById('newThreadTime').value
-    };
-    fetch('/api/add_thread', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) }).then(r => r.json()).then(d => { if(d.success) location.reload(); else alert(d.error); });
-}
+            const payload = {
+                name: document.getElementById('newThreadName').value,
+                category: currentCat,
+                redacted: document.getElementById('newThreadRedacted').value,
+                sub_category: document.getElementById('newThreadSubCat').value,
+                type: document.getElementById('newThreadType').value,
+                cadence: document.getElementById('newThreadCadence').value,
+                time_of_day: document.getElementById('newThreadTime').value
+            };
+            fetch('/api/add_thread', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(r => r.json()).then(d => { if (d.success) location.reload(); else alert(d.error); });
+        }
 
         function openEditModal(id, name, redacted, subCat, type, cadence, time_of_day) {
-    document.getElementById('editThreadId').value = id;
-    document.getElementById('editThreadName').value = name || '';
-    document.getElementById('editThreadRedacted').value = redacted || '';
-    document.getElementById('editThreadSubCat').value = subCat || '';
-    document.getElementById('editThreadType').value = type || 'perpetual';
-    document.getElementById('editThreadCadence').value = cadence || 'daily';
-    document.getElementById('editThreadTime').value = time_of_day || 'unspecified';
-    showModalWindow('editThreadModal');
-}
+            document.getElementById('editThreadId').value = id;
+            document.getElementById('editThreadName').value = name || '';
+            document.getElementById('editThreadRedacted').value = redacted || '';
+            document.getElementById('editThreadSubCat').value = subCat || '';
+            document.getElementById('editThreadType').value = type || 'perpetual';
+            document.getElementById('editThreadCadence').value = cadence || 'daily';
+            document.getElementById('editThreadTime').value = time_of_day || 'unspecified';
+            showModalWindow('editThreadModal');
+        }
 
         function submitEditThread() {
-    const payload = {
-        id: document.getElementById('editThreadId').value,
-        name: document.getElementById('editThreadName').value,
-        redacted: document.getElementById('editThreadRedacted').value,
-        sub_category: document.getElementById('editThreadSubCat').value,
-        type: document.getElementById('editThreadType').value,
-        cadence: document.getElementById('editThreadCadence').value,
-        time_of_day: document.getElementById('editThreadTime').value
-    };
-    fetch('/api/edit_thread', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) }).then(r => r.json()).then(d => { if(d.success) location.reload(); else alert(d.error); });
-}
+            const payload = {
+                id: document.getElementById('editThreadId').value,
+                name: document.getElementById('editThreadName').value,
+                redacted: document.getElementById('editThreadRedacted').value,
+                sub_category: document.getElementById('editThreadSubCat').value,
+                type: document.getElementById('editThreadType').value,
+                cadence: document.getElementById('editThreadCadence').value,
+                time_of_day: document.getElementById('editThreadTime').value
+            };
+            fetch('/api/edit_thread', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(r => r.json()).then(d => { if (d.success) location.reload(); else alert(d.error); });
+        }
 
         function openContextModalFromHeader() {
             showModalWindow('contextModal');
@@ -901,8 +1651,8 @@ body.edit-mode .label-controls { display: flex !important; }
             };
 
             fetch('/api/update_day_context', {
-                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
-            }).then(() => location.reload()); 
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+            }).then(() => location.reload());
         }
 
         let activeCell = null;
@@ -910,18 +1660,18 @@ body.edit-mode .label-controls { display: flex !important; }
             if (!IS_AUTH) { showModalWindow('loginModal'); return; }
             const status = el.getAttribute('data-status');
             const next = (status === 'empty') ? 'hit' : 'empty';
-            
+
             const currentNote = el.getAttribute('data-reason') || "";
             updateSquare(el, next, currentNote);
         }
-        
+
         function updateSquare(el, status, reason) {
             el.setAttribute('data-status', status);
-            
-            if (reason && reason.trim() !== "") { 
-                el.setAttribute('data-reason', reason); 
-            } else { 
-                el.removeAttribute('data-reason'); 
+
+            if (reason && reason.trim() !== "") {
+                el.setAttribute('data-reason', reason);
+            } else {
+                el.removeAttribute('data-reason');
             }
 
             let newClass = 'habit-cell ';
@@ -930,13 +1680,13 @@ body.edit-mode .label-controls { display: flex !important; }
             if (el.classList.contains('is-today')) newClass += 'is-today ';
             if (el.classList.contains('off-routine')) newClass += 'off-routine ';
             if (el.classList.contains('past-week')) newClass += 'past-week ';
-            
+
             el.className = newClass;
-            
+
             updateRowVisuals(el.getAttribute('data-id'), el.getAttribute('data-week'), el.getAttribute('data-cadence'));
-            
+
             fetch('/api/toggle_status', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ thread_id: el.getAttribute('data-id'), date: el.getAttribute('data-date'), status: status, miss_reason: reason })
             });
         }
@@ -945,12 +1695,12 @@ body.edit-mode .label-controls { display: flex !important; }
             let target = 0;
             if (cadence === 'weekly') target = 1;
             if (cadence === '3x_week') target = 3;
-            
+
             if (target > 0) {
                 const cells = document.querySelectorAll(`.habit-cell[data-id="${threadId}"][data-week="${weekIndex}"]`);
                 let hits = 0;
-                cells.forEach(c => { if(c.getAttribute('data-status') === 'hit') hits++; });
-                
+                cells.forEach(c => { if (c.getAttribute('data-status') === 'hit') hits++; });
+
                 cells.forEach(c => {
                     const status = c.getAttribute('data-status');
                     if (status !== 'hit' && status !== 'miss') {
@@ -964,13 +1714,13 @@ body.edit-mode .label-controls { display: flex !important; }
         }
 
         function handleRightClick(e, el) {
-            e.preventDefault(); 
+            e.preventDefault();
             if (!IS_AUTH) { showModalWindow('loginModal'); return; }
             activeCell = el;
-            
+
             const currentNote = el.getAttribute('data-reason') || "";
             document.getElementById('standaloneSquareNote').value = currentNote;
-            
+
             showModalWindow('squareNoteModal');
         }
 
@@ -988,25 +1738,36 @@ body.edit-mode .label-controls { display: flex !important; }
             const text = input.value.trim();
             if (!text) return;
             fetch('/api/update_day_context', {
-                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ comments: text })
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ comments: text })
             }).then(() => location.reload());
         }
-        
+
         document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                const gridWrapper = document.querySelector('.grid-wrapper.desktop-only');
+                if (gridWrapper) {
+                    gridWrapper.scrollLeft = gridWrapper.scrollWidth;
+                }
+            }, 50); 
+
             if (localStorage.getItem('habitEditMode') === 'true') {
                 document.body.classList.add('edit-mode');
                 const btn = document.getElementById('editToggleBtn');
                 if (btn) {
                     btn.classList.add('on');
                     const label = btn.querySelector('.edit-label');
-                    if(label) label.textContent = 'Edit: ON';
+                    if (label) label.textContent = 'Edit: ON';
                 }
             }
 
             const savedSortMode = localStorage.getItem('habitSortMode');
-    if (savedSortMode) {
-        setSortMode(savedSortMode);
-    }
+            if (savedSortMode) {
+                if (savedSortMode === 'calendar' && !IS_AUTH) {
+                    setSortMode('type');
+                } else {
+                    setSortMode(savedSortMode);
+                }
+            }
             const taskInput = document.getElementById('taskInput');
             if (taskInput) {
                 taskInput.addEventListener('keydown', (e) => {
@@ -1020,7 +1781,7 @@ body.edit-mode .label-controls { display: flex !important; }
 
         function toggleMobileView() {
             document.body.classList.toggle('show-log-view');
-            
+
             const btn = document.getElementById('mobileViewToggleBtn');
             if (document.body.classList.contains('show-log-view')) {
                 btn.innerHTML = '📊 Tracker';
@@ -1030,20 +1791,21 @@ body.edit-mode .label-controls { display: flex !important; }
         }
     </script>
 </head>
+
 <body>
     <div class="container">
         <div class="left-panel">
-            <div class="task-log-header">Log</div>
+            <div class="task-log-header"></div>
             <div class="task-log" id="taskLog">
                 {% if ctx.comment_list %}
-                    {% for msg in ctx.comment_list %}
-                        <div class="task-entry">
-                            <div class="task-text">{{ msg.text }}</div>
-                            <div class="task-timestamp">{{ msg.date }} · {{ msg.time if msg.time else "--:--" }}</div>
-                        </div>
-                    {% endfor %}
+                {% for msg in ctx.comment_list %}
+                <div class="task-entry">
+                    <div class="task-text">{{ msg.text }}</div>
+                    <div class="task-timestamp">{{ msg.date }} · {{ msg.time if msg.time else "--:--" }}</div>
+                </div>
+                {% endfor %}
                 {% else %}
-                    <div style="color:#999; text-align:center; margin-top:50px; font-size: 12px;">No entries yet.</div>
+                <div style="color:#999; text-align:center; margin-top:50px; font-size: 12px;">No entries yet.</div>
                 {% endif %}
             </div>
 
@@ -1062,230 +1824,526 @@ body.edit-mode .label-controls { display: flex !important; }
                     Escape Velocity
                 </h1>
 
-                <button class="mobile-view-toggle" id="mobileViewToggleBtn" onclick="toggleMobileView()" {% if not is_auth %}style="right: 85px;"{% endif %}>📝 Log</button>
+                <button class="mobile-view-toggle" id="mobileViewToggleBtn" onclick="toggleMobileView()" {% if not
+                    is_auth %}style="right: 85px;" {% endif %}>📝 Log</button>
 
                 <div class="controls">
                     <div class="toggle-group">
-                        <button class="tgl-btn sort-tgl active" data-mode="type" onclick="setSortMode('type')">By Type</button>
+                        <button class="tgl-btn sort-tgl active" data-mode="type" onclick="setSortMode('type')">By
+                            Type</button>
                         <button class="tgl-btn sort-tgl" data-mode="time" onclick="setSortMode('time')">By Time</button>
-                        <button class="tgl-btn" onclick="window.location.href='{{ url_for('calendar') }}'">Calendar</button>
+                        <button class="tgl-btn sort-tgl" data-mode="calendar"
+                            onclick="setSortMode('calendar')">Calendar</button>
                     </div>
 
                     {% if is_auth %}
-                        <button class="control-btn mobile-menu-btn" onclick="toggleMobileMenu()">⋮</button>
+                    <button class="control-btn mobile-menu-btn" onclick="toggleMobileMenu()">⋮</button>
 
-                        <div class="action-buttons" id="actionButtons">
-                            <div class="edit-toggle" id="editToggleBtn" onclick="toggleEditMode()">
-                                <span class="edit-dot"></span>
-                                <span class="edit-label">Edit: OFF</span>
-                            </div>
-                            
-                            <button class="control-btn" onclick="openContextModalFromHeader(); hideMobileMenu();">Day Context</button>
-                            <button class="control-btn" onclick="logoutAuth()">Lock</button>
+                    <div class="action-buttons" id="actionButtons">
+                        <div class="edit-toggle" id="editToggleBtn" onclick="toggleEditMode()">
+                            <span class="edit-dot"></span>
+                            <span class="edit-label">Edit: OFF</span>
                         </div>
+
+                        <button class="control-btn" onclick="openContextModalFromHeader(); hideMobileMenu();">Day
+                            Context</button>
+                        <button class="control-btn" onclick="logoutAuth()">Lock</button>
+                    </div>
                     {% else %}
-                        <button class="control-btn unlock-btn" onclick="showModalWindow('loginModal')">Unlock</button>
+                    <button class="control-btn unlock-btn" onclick="showModalWindow('loginModal')">Unlock</button>
                     {% endif %}
                 </div>
             </div>
-            
+
             {% set first_cat = categories[0] %}
             {% if grouped_threads[first_cat] and grouped_threads[first_cat][0] %}
-                {% set total_weeks = grouped_threads[first_cat][0].weeks | length %}
+            {% set total_weeks = grouped_threads[first_cat][0].weeks | length %}
             {% else %}
-                {% set total_weeks = 52 %}
+            {% set total_weeks = 52 %}
             {% endif %}
 
             <div class="grid-wrapper desktop-only">
-            <div class="grid-container" style="grid-template-columns: max-content repeat({{ total_weeks }}, 14px 14px 14px 14px 14px 14px 14px 3px);">    {% if week_headers %}
-        {% set months_names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] %}
-        
-        {% set ns = namespace(prev_month='') %}
-        
-        {% for header in week_headers %}
-            {% set w_idx = loop.index0 %}
-            {% set start_col = 2 + (w_idx * 8) %}
-            
-            {% set first_day = grouped_threads[categories[0]][0].weeks[w_idx][0].date %}
-            {% set current_month = months_names[first_day.split('-')[1]|int - 1] %}
+                <div class="grid-container"
+                    style="grid-template-columns: max-content repeat({{ total_weeks }}, 14px 14px 14px 14px 14px 14px 14px 3px);">
+                    {% if week_headers %}
+                    <div class="grid-corner-nav">
+                        <button type="button" class="grid-nav-btn"
+                            onclick="navigateWeeks({{ current_offset - 6 }})">←</button>
 
-            {% if current_month != ns.prev_month %}
-                
-                {% set span_ns = namespace(weeks_count=0, diff_found=false) %}
-                {% for lookahead in week_headers %}
+                        {% if current_offset != 0 %}
+                        <button type="button" class="grid-nav-btn" onclick="navigateWeeks(0)"
+                            style="font-size: 10px;">Today</button>
+                        {% endif %}
+
+                        <button type="button" class="grid-nav-btn"
+                            onclick="navigateWeeks({{ current_offset + 6 }})">→</button>
+                    </div>
+                    {% set months_names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] %}
+                    {% set months_names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] %}
+
+                    {% set ns = namespace(prev_month='') %}
+
+                    {% for header in week_headers %}
+                    {% set w_idx = loop.index0 %}
+                    {% set start_col = 2 + (w_idx * 8) %}
+
+                    {% set first_day = grouped_threads[categories[0]][0].weeks[w_idx][0].date %}
+                    {% set current_month = months_names[first_day.split('-')[1]|int - 1] %}
+
+                    {% if current_month != ns.prev_month %}
+
+                    {% set span_ns = namespace(weeks_count=0, diff_found=false) %}
+                    {% for lookahead in week_headers %}
                     {% set l_idx = loop.index0 %}
                     {% if l_idx >= w_idx and not span_ns.diff_found %}
-                        {% set l_first_day = grouped_threads[categories[0]][0].weeks[l_idx][0].date %}
-                        {% set l_month = months_names[l_first_day.split('-')[1]|int - 1] %}
-                        
-                        {% if l_month == current_month %}
-                            {% set span_ns.weeks_count = span_ns.weeks_count + 1 %}
-                        {% else %}
-                            {% set span_ns.diff_found = true %}
-                        {% endif %}
+                    {% set l_first_day = grouped_threads[categories[0]][0].weeks[l_idx][0].date %}
+                    {% set l_month = months_names[l_first_day.split('-')[1]|int - 1] %}
+
+                    {% if l_month == current_month %}
+                    {% set span_ns.weeks_count = span_ns.weeks_count + 1 %}
+                    {% else %}
+                    {% set span_ns.diff_found = true %}
                     {% endif %}
-                {% endfor %}
+                    {% endif %}
+                    {% endfor %}
 
-                {% set span_cols = (span_ns.weeks_count * 8) - 1 %}
+                    {% set span_cols = (span_ns.weeks_count * 8) - 1 %}
 
-                <div class="month-band" style="grid-column: {{ start_col }} / span {{ span_cols }};">
-                    <span class="month-band-label">{{ current_month }}</span>
-                    <span class="month-band-line"></span>
-                </div>
+                    <div class="month-band" style="grid-column: {{ start_col }} / span {{ span_cols }};">
+                        <span class="month-band-label">{{ current_month }}</span>
+                        <span class="month-band-line"></span>
+                    </div>
 
-                {% set ns.prev_month = current_month %}
-            {% endif %}
+                    {% set ns.prev_month = current_month %}
+                    {% endif %}
 
-            <div class="week-band" style="grid-column: {{ start_col }} / span 7;">
-                <span class="week-band-label">{{ header }}</span>
-                <span class="week-band-line"></span>
-            </div>
-        {% endfor %}
-        
-        {% set days_letters = ['M','T','W','T','F','S','S'] %}
-        {% for week in grouped_threads[categories[0]][0].weeks %}
-            {% set w_idx = loop.index0 %}
-            {% for day in week %}
-                {% set d_idx = loop.index0 %}
-                {% set col = 2 + (w_idx * 8) + d_idx %}
-                <div class="day-date" style="grid-column: {{ col }};">{{ day.date.split('-')[-1] }}</div>
-                <div class="day-letter" style="grid-column: {{ col }};">{{ days_letters[d_idx] }}</div>
-            {% endfor %}
-        {% endfor %}
-    {% endif %}
+                    <div class="week-band" style="grid-column: {{ start_col }} / span 7;">
+                        <span class="week-band-label">{{ header }}</span>
+                        <span class="week-band-line"></span>
+                    </div>
+                    {% endfor %}
 
-    {% set ns_sort = namespace(idx=0) %}
-    {% for cat in categories %}
-        <div class="category-header type-header" data-cat="{{ cat }}">
-            <span>{{ cat|upper }}</span>
-            {% if is_auth %}
-                <button class="cat-add-btn" onclick="openAddModal('{{ cat }}')">＋</button>
-            {% endif %}
-        </div>
-        
-        {% for item in grouped_threads[cat] %}
-            {% set ns_sort.idx = ns_sort.idx + 1 %}
-            {% set t_time = item.info.time_of_day if item.info.time_of_day else 'unspecified' %}
-            
-            <div class="habit-label" data-idx="{{ ns_sort.idx }}" data-cat="{{ cat }}" data-time="{{ t_time }}">
-                <span class="habit-name">{{ item.info.thread_name }}</span>
-                <div class="label-controls">
-                    <button class="l-btn" onclick="moveThread('{{ item.info.thread_id }}', 'up')">↑</button>
-                    <button class="l-btn" onclick="moveThread('{{ item.info.thread_id }}', 'down')">↓</button>
-                    <button class="l-btn" onclick="openEditModal('{{ item.info.thread_id }}', '{{ item.info.thread_name }}', '{{ item.info.thread_name_redacted or '' }}', '{{ item.info.sub_category or '' }}', '{{ item.info.type }}', '{{ item.info.cadence }}', '{{ t_time }}')">✎</button>
-                    <button class="l-btn red" onclick="deleteThread('{{ item.info.thread_id }}', '{{ item.info.thread_name }}')">×</button>
-                </div>
-            </div>
-            
-            {% for week in item.weeks %}
-                {% set w_idx = loop.index0 %}
-                {% set is_last_week = loop.last %}
-                {% for day in week %}
+                    {% set days_letters = ['M','T','W','T','F','S','S'] %}
+                    {% for week in grouped_threads[categories[0]][0].weeks %}
+                    {% set w_idx = loop.index0 %}
+                    {% for day in week %}
+                    {% set d_idx = loop.index0 %}
+                    {% set col = 2 + (w_idx * 8) + d_idx %}
+                    <div class="day-date" style="grid-column: {{ col }};">{{ day.date.split('-')[-1] }}</div>
+                    <div class="day-letter" style="grid-column: {{ col }};">{{ days_letters[d_idx] }}</div>
+                    {% endfor %}
+                    {% endfor %}
+                    {% endif %}
+
+                    {% set ns_sort = namespace(idx=0) %}
+                    {% for cat in categories %}
+                    <div class="category-header type-header" data-cat="{{ cat }}">
+                        <span>
+                            {{ cat|upper }}
+                            {% if is_auth %}
+                            <button class="cat-add-btn" onclick="openAddModal('{{ cat }}')">＋</button>
+                            {% endif %}
+                        </span>
+                    </div>
+
+                    {% for item in grouped_threads[cat] %}
+                    {% set ns_sort.idx = ns_sort.idx + 1 %}
+                    {% set t_time = item.info.time_of_day if item.info.time_of_day else 'unspecified' %}
+
+                    <div class="habit-label" data-idx="{{ ns_sort.idx }}" data-cat="{{ cat }}" data-time="{{ t_time }}"
+                        data-rank="{{ item.info.rank }}"> <span class="habit-name">{{ item.info.thread_name }}</span>
+                        <div class="label-controls">
+                            <button class="l-btn" onclick="moveThread('{{ item.info.thread_id }}', 'up')">↑</button>
+                            <button class="l-btn" onclick="moveThread('{{ item.info.thread_id }}', 'down')">↓</button>
+                            <button class="l-btn"
+                                onclick="openEditModal('{{ item.info.thread_id }}', '{{ item.info.thread_name }}', '{{ item.info.thread_name_redacted or '' }}', '{{ item.info.sub_category or '' }}', '{{ item.info.type }}', '{{ item.info.cadence }}', '{{ t_time }}')">✎</button>
+                            <button class="l-btn red"
+                                onclick="deleteThread('{{ item.info.thread_id }}', '{{ item.info.thread_name }}')">×</button>
+                        </div>
+                    </div>
+
+                    {% for week in item.weeks %}
+                    {% set w_idx = loop.index0 %}
+                    {% set is_last_week = loop.last %}
+                    {% for day in week %}
                     {% set d_idx = loop.index0 %}
                     {% set current_col = 2 + (w_idx * 8) + d_idx %}
-                    
+
                     <div class="habit-cell {% if day.status == 'hit' %}completed{% endif %} {% if day.is_today %}is-today{% endif %} {% if not is_last_week %}past-week{% endif %}"
-                         style="grid-column: {{ current_col }};"
-                         data-id="{{ item.info.thread_id }}"
-                         data-date="{{ day.date }}"
-                         data-status="{{ day.status }}"
-                         data-week="{{ w_idx }}"
-                         data-idx="{{ ns_sort.idx }}" data-cat="{{ cat }}" data-time="{{ t_time }}"
-                         {% if day.miss_reason %}data-reason="{{ day.miss_reason }}"{% endif %}
-                         onclick="handleCellClick(this)"
-                         oncontextmenu="handleRightClick(event, this)">
+                        style="grid-column: {{ current_col }};" data-id="{{ item.info.thread_id }}"
+                        data-date="{{ day.date }}" data-rank="{{ item.info.rank }}" data-status="{{ day.status }}"
+                        data-week="{{ w_idx }}" data-idx="{{ ns_sort.idx }}" data-cat="{{ cat }}"
+                        data-time="{{ t_time }}" {% if day.miss_reason %}data-reason="{{ day.miss_reason }}" {% endif %}
+                        onclick="handleCellClick(this)" oncontextmenu="handleRightClick(event, this)">
                     </div>
-                {% endfor %}
-            {% endfor %}
-        {% endfor %}
-    {% endfor %}
+                    {% endfor %}
+                    {% endfor %}
+                    {% endfor %}
+                    {% endfor %}
 
-    {% set time_keys = ['morning', 'midday', 'evening', 'night', 'unspecified'] %}
-    {% set time_labels = {'morning': '🌅 Morning', 'midday': '☀️ Midday', 'evening': '🌆 Evening', 'night': '🌙 Night', 'unspecified': '❔ Unspecified'} %}
-    {% for t_key in time_keys %}
-        <div class="time-group-header time-header" data-time="{{ t_key }}" style="display:none;">
-            <span class="time-group-label">{{ time_labels[t_key] }}</span>
-        </div>
-    {% endfor %}
-</div> </div>
-
-<div class="grid-wrapper mobile-only"> 
-        <div class="grid-container" style="grid-template-columns: max-content repeat(7, 14px); row-gap: 6px;">    
-            {% if week_headers %}
-                {% set last_header = week_headers[-1] %}
-                <div class="week-band" style="grid-column: 2 / span 7;">
-                    <span class="week-band-label">{{ last_header }}</span>
-                    <span class="week-band-line"></span>
+                    {% set time_keys = ['morning', 'midday', 'evening', 'night', 'unspecified'] %}
+                    {% set time_labels = {'morning': '🌅 Morning', 'midday': '☀️ Midday', 'evening': '🌆 Evening',
+                    'night': '🌙 Night', 'unspecified': '❔ Unspecified'} %}
+                    {% for t_key in time_keys %}
+                    <div class="time-group-header time-header" data-time="{{ t_key }}" style="display:none;">
+                        <span class="time-group-label">{{ time_labels[t_key] }}</span>
+                    </div>
+                    {% endfor %}
                 </div>
-                
-                {% set days_letters = ['M','T','W','T','F','S','S'] %}
-                {% set last_week_days = grouped_threads[categories[0]][0].weeks[-1] %}
-                {% for day in last_week_days %}
+            </div>
+
+            <div class="grid-wrapper mobile-only">
+                <div class="grid-container" style="grid-template-columns: max-content repeat(7, 14px); row-gap: 6px;">
+                    {% if week_headers %}
+                    {% set last_header = week_headers[-1] %}
+                    <div class="week-band" style="grid-column: 2 / span 7;">
+                        <span class="week-band-label">{{ last_header }}</span>
+                        <span class="week-band-line"></span>
+                    </div>
+
+                    {% set days_letters = ['M','T','W','T','F','S','S'] %}
+                    {% set last_week_days = grouped_threads[categories[0]][0].weeks[-1] %}
+                    {% for day in last_week_days %}
                     {% set col = 2 + loop.index0 %}
                     <div class="day-date" style="grid-column: {{ col }};">{{ day.date.split('-')[-1] }}</div>
                     <div class="day-letter" style="grid-column: {{ col }};">{{ days_letters[loop.index0] }}</div>
-                {% endfor %}
-            {% endif %}
-
-            {% set ns_sort = namespace(idx=0) %}
-            {% for cat in categories %}
-                <div class="category-header type-header" data-cat="{{ cat }}">
-                    <span>{{ cat|upper }}</span>
-                    {% if is_auth %}
-                        <button class="cat-add-btn" onclick="openAddModal('{{ cat }}')">＋</button>
+                    {% endfor %}
                     {% endif %}
-                </div>
-                
-                {% for item in grouped_threads[cat] %}
+
+                    {% set ns_sort = namespace(idx=0) %}
+                    {% for cat in categories %}
+                    <div class="category-header type-header" data-cat="{{ cat }}">
+                        <span>{{ cat|upper }}</span>
+                        {% if is_auth %}
+                        <button class="cat-add-btn" onclick="openAddModal('{{ cat }}')">＋</button>
+                        {% endif %}
+                    </div>
+
+                    {% for item in grouped_threads[cat] %}
                     {% set ns_sort.idx = ns_sort.idx + 1 %}
                     {% set t_time = item.info.time_of_day if item.info.time_of_day else 'unspecified' %}
-                    
-                    <div class="habit-label" data-idx="{{ ns_sort.idx }}" data-cat="{{ cat }}" data-time="{{ t_time }}">
+
+                    <div class="habit-label" data-idx="{{ ns_sort.idx }}" data-cat="{{ cat }}" data-time="{{ t_time }}"
+                        data-rank="{{ item.info.rank }}">
                         <span class="habit-name">{{ item.info.thread_name }}</span>
                         <div class="label-controls">
                             <button class="l-btn" onclick="moveThread('{{ item.info.thread_id }}', 'up')">↑</button>
                             <button class="l-btn" onclick="moveThread('{{ item.info.thread_id }}', 'down')">↓</button>
-                            <button class="l-btn" onclick="openEditModal('{{ item.info.thread_id }}', '{{ item.info.thread_name }}', '{{ item.info.thread_name_redacted or '' }}', '{{ item.info.sub_category or '' }}', '{{ item.info.type }}', '{{ item.info.cadence }}', '{{ t_time }}')">✎</button>
-                            <button class="l-btn red" onclick="deleteThread('{{ item.info.thread_id }}', '{{ item.info.thread_name }}')">×</button>
+                            <button class="l-btn"
+                                onclick="openEditModal('{{ item.info.thread_id }}', '{{ item.info.thread_name }}', '{{ item.info.thread_name_redacted or '' }}', '{{ item.info.sub_category or '' }}', '{{ item.info.type }}', '{{ item.info.cadence }}', '{{ t_time }}')">✎</button>
+                            <button class="l-btn red"
+                                onclick="deleteThread('{{ item.info.thread_id }}', '{{ item.info.thread_name }}')">×</button>
                         </div>
                     </div>
-                    
+
                     {% set last_week = item.weeks[-1] %}
                     {% for day in last_week %}
-                        {% set current_col = 2 + loop.index0 %}
-                        <div class="habit-cell {% if day.status == 'hit' %}completed{% endif %} {% if day.is_today %}is-today{% endif %}"
-                             style="grid-column: {{ current_col }};"
-                             data-id="{{ item.info.thread_id }}"
-                             data-date="{{ day.date }}"
-                             data-status="{{ day.status }}"
-                             data-week="{{ item.weeks|length - 1 }}"
-                             data-idx="{{ ns_sort.idx }}" data-cat="{{ cat }}" data-time="{{ t_time }}"
-                             {% if day.miss_reason %}data-reason="{{ day.miss_reason }}"{% endif %}
-                             onclick="handleCellClick(this)"
-                             oncontextmenu="handleRightClick(event, this)">
-                        </div>
+                    {% set current_col = 2 + loop.index0 %}
+                    <div class="habit-cell {% if day.status == 'hit' %}completed{% endif %} {% if day.is_today %}is-today{% endif %}"
+                        style="grid-column: {{ current_col }};" data-id="{{ item.info.thread_id }}"
+                        data-date="{{ day.date }}" data-rank="{{ item.info.rank }}" data-status="{{ day.status }}"
+                        data-week="{{ item.weeks|length - 1 }}" data-idx="{{ ns_sort.idx }}" data-cat="{{ cat }}"
+                        data-time="{{ t_time }}" {% if day.miss_reason %}data-reason="{{ day.miss_reason }}" {% endif %}
+                        onclick="handleCellClick(this)" oncontextmenu="handleRightClick(event, this)">
+                    </div>
                     {% endfor %}
-                {% endfor %}
-            {% endfor %}
-            {% set time_keys = ['morning', 'midday', 'evening', 'night', 'unspecified'] %}
-            {% set time_labels = {'morning': '🌅 Morning', 'midday': '☀️ Midday', 'evening': '🌆 Evening', 'night': '🌙 Night', 'unspecified': '❔ Unspecified'} %}
-            {% for t_key in time_keys %}
-                <div class="time-group-header time-header" data-time="{{ t_key }}" style="display:none;">
-                    <span class="time-group-label">{{ time_labels[t_key] }}</span>
+                    {% endfor %}
+                    {% endfor %}
+                    {% set time_keys = ['morning', 'midday', 'evening', 'night', 'unspecified'] %}
+                    {% set time_labels = {'morning': '🌅 Morning', 'midday': '☀️ Midday', 'evening': '🌆 Evening',
+                    'night': '🌙 Night', 'unspecified': '❔ Unspecified'} %}
+                    {% for t_key in time_keys %}
+                    <div class="time-group-header time-header" data-time="{{ t_key }}" style="display:none;">
+                        <span class="time-group-label">{{ time_labels[t_key] }}</span>
+                    </div>
+                    {% endfor %}
                 </div>
-            {% endfor %}
+            </div>
+            <div id="calendarView" class="grid-wrapper" style="display: none; margin-top: 16px;">
+                <div class="cal-container" style="padding: 10px 20px 20px 20px;">
+                    <div class="cal-header" style="padding-top: 10px;">
+                        <button class="cal-nav-btn" onclick="calNavigate(-1)">←</button>
+                        <span class="cal-month-title" id="calMonthTitle"></span>
+                        <span class="cal-year-title" id="calYearTitle"></span>
+                        <button class="cal-nav-btn" onclick="calNavigate(1)">→</button>
+                        <button class="cal-today-btn" id="calTodayBtn" onclick="calGoToday()"
+                            style="display: none;">today</button>
+                        <span class="cal-logged-count" id="calLoggedCount">0/0 logged</span>
+                    </div>
+
+                    <div class="cal-legend" id="calLegendContainer" style="margin-top: 10px;"></div>
+                    <div class="cal-stats-bar" id="calStatsBar" style="margin: 15px 0;"></div>
+                    <div class="cal-dow-grid" id="calDowGrid"></div>
+                    <div class="cal-calendar-grid" id="calGrid"></div>
+                </div>
+            </div>
+
+            <div class="cal-modal-overlay" id="calModalOverlay" onclick="calCloseEditor(event)">
+                <div class="cal-modal-content" onclick="event.stopPropagation()">
+                    <div class="cal-modal-header">
+                        <span class="cal-modal-title" id="calModalTitle"></span>
+                        <button class="cal-close-btn" onclick="calCloseEditor(event)">×</button>
+                    </div>
+                    <div id="calSegmentsContainer"></div>
+                    <div class="cal-modal-footer">
+                        <button class="control-btn" id="calAddSegmentBtn" onclick="calAddSegment()">+ add
+                            segment</button>
+                        <button class="modal-btn black" onclick="calSaveDay()">Save</button>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+                const CAL_HORIZONS = [
+                    { id: "survival", label: "Survival", short: "Now", color: "#888" },
+                    { id: "2wk", label: "2 wk", short: "2 wk", color: "#7dd3fc" },
+                    { id: "1yr", label: "1 yr", short: "1 yr", color: "#3b82f6" },
+                    { id: "5yr", label: "5 yr", short: "5 yr", color: "#d946ef" },
+                    { id: "10yr", label: "10+ yr", short: "10+", color: "#f59e0b" }
+                ];
+                const CAL_DOW = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+                const CAL_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+                const CAL_FULL_DOW = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+                const calToday = new Date();
+                let calViewYear = calToday.getFullYear();
+                let calViewMonth = calToday.getMonth();
+                let calDataMap = {};
+                let calEditDay = null;
+                let calEditSegments = [];
+                window.calDataLoaded = false;
+
+                function calGetDaysInMonth(year, month) { return new Date(year, month + 1, 0).getDate(); }
+                function calGetFirstDayOfWeek(year, month) {
+                    let d = new Date(year, month, 1).getDay();
+                    return d === 0 ? 6 : d - 1;
+                }
+
+                async function loadCalData() {
+                    if (!IS_AUTH) return;
+                    try {
+                        const response = await fetch(`/api/calendar/${calViewYear}/${calViewMonth}`);
+                        calDataMap = response.ok ? await response.json() : {};
+                    } catch (e) { calDataMap = {}; }
+                    renderCalAll();
+                }
+
+                async function calSaveDay() {
+                    const filtered = calEditSegments.filter(s => s.text.trim() !== "");
+                    const dateStr = `${calViewYear}-${String(calViewMonth + 1).padStart(2, '0')}-${String(calEditDay).padStart(2, '0')}`;
+                    try {
+                        const response = await fetch('/api/calendar/save', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ date: dateStr, segments: filtered })
+                        });
+                        if (response.ok) {
+                            if (filtered.length === 0) delete calDataMap[calEditDay];
+                            else calDataMap[calEditDay] = filtered;
+                            renderCalAll();
+                            calCloseEditor();
+                        } else alert("Помилка збереження");
+                    } catch (e) { console.error("Помилка:", e); }
+                }
+
+                function calNavigate(dir) {
+                    calViewMonth += dir;
+                    if (calViewMonth < 0) { calViewMonth = 11; calViewYear--; }
+                    if (calViewMonth > 11) { calViewMonth = 0; calViewYear++; }
+                    loadCalData();
+                }
+
+                function calGoToday() {
+                    calViewYear = calToday.getFullYear(); calViewMonth = calToday.getMonth();
+                    loadCalData();
+                }
+
+                function renderCalAll() {
+                    const isCurrentMonth = calViewYear === calToday.getFullYear() && calViewMonth === calToday.getMonth();
+                    const daysInMonth = calGetDaysInMonth(calViewYear, calViewMonth);
+                    const loggedCount = Object.keys(calDataMap).length;
+
+                    document.getElementById('calMonthTitle').innerText = CAL_MONTHS[calViewMonth];
+                    document.getElementById('calYearTitle').innerText = calViewYear;
+                    document.getElementById('calTodayBtn').style.display = isCurrentMonth ? 'none' : 'inline-block';
+                    document.getElementById('calLoggedCount').innerText = `${loggedCount}/${daysInMonth} logged`;
+
+                    const legendContainer = document.getElementById('calLegendContainer');
+                    if (!legendContainer.innerHTML) {
+                        legendContainer.innerHTML = CAL_HORIZONS.map(h => `
+                    <div class="cal-legend-item"><div class="cal-dot" style="background: ${h.color};"></div><span>${h.label}</span></div>
+                `).join('');
+                        document.getElementById('calDowGrid').innerHTML = CAL_DOW.map(d => `<div class="cal-dow-item">${d}</div>`).join('');
+                    }
+
+                    const statsBar = document.getElementById('calStatsBar');
+                    statsBar.innerHTML = '';
+                    statsBar.style.display = 'flex';
+
+                    for (let d = 1; d <= daysInMonth; d++) {
+                        const daySegs = calDataMap[d] || [];
+
+                        if (daySegs.length > 0) {
+                            daySegs.forEach(s => {
+                                const horizonInfo = CAL_HORIZONS.find(h => h.id === s.horizon);
+                                const color = horizonInfo ? horizonInfo.color : '#888';
+
+                                let div = document.createElement('div');
+                                div.className = 'cal-stats-segment';
+                                div.style.width = `${(1 / daysInMonth / daySegs.length) * 100}%`;
+                                div.style.background = color;
+                                statsBar.appendChild(div);
+                            });
+                        } else {
+                            let div = document.createElement('div');
+                            div.style.width = `${(1 / daysInMonth) * 100}%`;
+                            div.style.background = 'transparent';
+                            statsBar.appendChild(div);
+                        }
+                    }
+
+                    const grid = document.getElementById('calGrid');
+                    grid.innerHTML = '';
+                    const firstDow = calGetFirstDayOfWeek(calViewYear, calViewMonth);
+
+                    for (let i = 0; i < firstDow; i++) grid.appendChild(document.createElement('div'));
+
+                    for (let day = 1; day <= daysInMonth; day++) {
+                        const isToday = isCurrentMonth && day === calToday.getDate();
+                        const isFuture = isCurrentMonth && day > calToday.getDate();
+                        const segs = calDataMap[day] || [];
+
+                        let colors = segs.map(s => {
+                            let h = CAL_HORIZONS.find(hz => hz.id === s.horizon);
+                            return h ? h.color : null;
+                        }).filter(Boolean);
+
+                        let bgStyle = '';
+                        let coloredClass = '';
+
+                        if (colors.length === 1) {
+                            bgStyle = `background: ${colors[0]};`;
+                            coloredClass = 'colored-cell';
+                        } else if (colors.length > 1) {
+                            let stops = [];
+                            let step = 100 / colors.length;
+                            colors.forEach((c, i) => {
+                                stops.push(`${c} ${i * step}%`);
+                                stops.push(`${c} ${(i + 1) * step}%`);
+                            });
+                            bgStyle = `background: linear-gradient(135deg, ${stops.join(', ')});`;
+                            coloredClass = 'colored-cell';
+                        }
+
+                        let cell = document.createElement('div');
+                        cell.className = `cal-day-cell ${isToday ? 'is-today' : ''} ${isFuture ? 'is-future' : ''} ${coloredClass}`;
+                        if (bgStyle) cell.style.cssText = bgStyle;
+                        cell.onclick = () => calOpenEditor(day);
+
+                        let previewText = segs.map(s => s.text).filter(Boolean).join(" · ");
+                        let textHtml = previewText ? `<div class="cal-day-preview">${previewText}</div>` : '';
+
+                        cell.innerHTML = `
+                    <div class="cal-day-header"><span class="cal-day-number">${day}</span></div>
+                    ${textHtml}
+                `;
+                        grid.appendChild(cell);
+                    }
+                }
+
+                function calOpenEditor(day) {
+                    calEditDay = day;
+                    const existingData = calDataMap[day];
+                    if (existingData && existingData.length > 0) calEditSegments = JSON.parse(JSON.stringify(existingData));
+                    else calEditSegments = [{ horizon: "1yr", text: "" }];
+
+                    const dateObj = new Date(calViewYear, calViewMonth, calEditDay);
+                    document.getElementById('calModalTitle').innerText = `${CAL_FULL_DOW[dateObj.getDay()]}, ${CAL_MONTHS[calViewMonth]} ${calEditDay}`;
+                    document.getElementById('calModalOverlay').style.display = 'flex';
+                    renderCalModalSegments();
+                }
+
+                function navigateWeeks(newOffset) {
+                    window.location.href = "/?offset=" + newOffset;
+                }
+
+                function calCloseEditor(e) {
+                    if (e) e.stopPropagation();
+                    calEditDay = null;
+                    document.getElementById('calModalOverlay').style.display = 'none';
+                }
+
+                function calAddSegment() {
+                    if (calEditSegments.length < 4) {
+                        calEditSegments.push({ horizon: "1yr", text: "" });
+                        renderCalModalSegments();
+                    }
+                }
+
+                function calRemoveSegment(index) {
+                    calEditSegments.splice(index, 1);
+                    renderCalModalSegments();
+                }
+
+                function calUpdateSegment(index, field, value) {
+                    calEditSegments[index][field] = value;
+                    if (field === 'horizon') renderCalModalSegments();
+                    else if (field === 'text') {
+                        const charCountSpan = document.getElementById(`cal-char-count-${index}`);
+                        if (charCountSpan) {
+                            charCountSpan.innerText = `${value.length}/140`;
+                            charCountSpan.style.color = value.length > 120 ? '#d32f2f' : '#ccc';
+                        }
+                    }
+                }
+
+                function renderCalModalSegments() {
+                    const container = document.getElementById('calSegmentsContainer');
+                    container.innerHTML = '';
+                    calEditSegments.forEach((seg, i) => {
+                        let segmentDiv = document.createElement('div');
+                        segmentDiv.className = 'cal-segment';
+                        let horizonsHtml = CAL_HORIZONS.map(h => {
+                            const isActive = seg.horizon === h.id;
+                            const style = isActive
+                                ? `background: ${h.color}; border: 2px solid #fff; outline: 2px solid ${h.color}; outline-offset: 1px;`
+                                : `background: #f0f0f0; border: 1.5px solid #ddd; outline: none;`;
+                            return `<button class="cal-h-btn" style="${style}" onclick="calUpdateSegment(${i}, 'horizon', '${h.id}')" title="${h.label}"></button>`;
+                        }).join('');
+
+                        const currentHorizonName = CAL_HORIZONS.find(h => h.id === seg.horizon)?.label || '';
+                        const charCountColor = seg.text.length > 120 ? '#d32f2f' : '#ccc';
+                        const removeBtnHtml = calEditSegments.length > 1 ? `<button class="cal-close-btn" style="margin-left: auto;" onclick="calRemoveSegment(${i})">×</button>` : '';
+
+                        segmentDiv.innerHTML = `
+                    <div class="cal-horizon-selector">${horizonsHtml}<span class="cal-h-label">${currentHorizonName}</span>${removeBtnHtml}</div>
+                    <div class="cal-textarea-wrapper">
+                        <textarea class="cal-textarea" rows="3" placeholder="What was the focus of this segment? (140 chars)" 
+                            oninput="calUpdateSegment(${i}, 'text', this.value.slice(0, 140))">${seg.text}</textarea>
+                        <span class="cal-char-count" id="cal-char-count-${i}" style="color: ${charCountColor}">${seg.text.length}/140</span>
+                    </div>
+                `;
+                        container.appendChild(segmentDiv);
+                    });
+                    document.getElementById('calAddSegmentBtn').style.visibility = calEditSegments.length < 4 ? 'visible' : 'hidden';
+                }
+            </script>
         </div>
     </div>
 
     <div class="modal" id="addThreadModal">
         <div class="modal-content">
-            <div class="modal-title">New Habit: <span id="catNameDisplay" style="color:#999; font-weight:normal;"></span></div>
+            <div class="modal-title">New Habit: <span id="catNameDisplay"
+                    style="color:#999; font-weight:normal;"></span></div>
             <div style="text-align: left; margin-bottom: 20px;">
                 <label class="m-label">Name</label><input type="text" id="newThreadName" class="m-input">
                 <label class="m-label">Hidden Name</label><input type="text" id="newThreadRedacted" class="m-input">
                 <label class="m-label">Sub Category</label><input type="text" id="newThreadSubCat" class="m-input">
                 <label class="m-label">Type</label>
-                <select id="newThreadType" class="m-input"><option value="perpetual">Perpetual</option><option value="quest">Quest</option><option value="frog">Frog</option></select>
+                <select id="newThreadType" class="m-input">
+                    <option value="perpetual">Perpetual</option>
+                    <option value="quest">Quest</option>
+                    <option value="frog">Frog</option>
+                </select>
                 <label class="m-label">Frequency</label>
                 <select id="newThreadCadence" class="m-input">
                     <option value="daily">Daily</option>
@@ -1296,13 +2354,13 @@ body.edit-mode .label-controls { display: flex !important; }
                     <option value="yearly">Yearly</option>
                 </select>
                 <label class="m-label">Time of Day</label>
-<select id="newThreadTime" class="m-input">
-    <option value="morning">🌅 Morning</option>
-    <option value="midday">☀️ Midday</option>
-    <option value="evening">🌆 Evening</option>
-    <option value="night">🌙 Night</option>
-    <option value="unspecified" selected>❔ Unspecified</option>
-</select>
+                <select id="newThreadTime" class="m-input">
+                    <option value="morning">🌅 Morning</option>
+                    <option value="midday">☀️ Midday</option>
+                    <option value="evening">🌆 Evening</option>
+                    <option value="night">🌙 Night</option>
+                    <option value="unspecified" selected>❔ Unspecified</option>
+                </select>
             </div>
             <div class="modal-buttons">
                 <button class="modal-btn cancel" onclick="hideModalWindow('addThreadModal')">Cancel</button>
@@ -1318,20 +2376,20 @@ body.edit-mode .label-controls { display: flex !important; }
                 <input type="hidden" id="editThreadId">
                 <label class="m-label">Name</label>
                 <input type="text" id="editThreadName" class="m-input">
-                
+
                 <label class="m-label">Hidden Name</label>
                 <input type="text" id="editThreadRedacted" class="m-input">
-                
+
                 <label class="m-label">Sub Category</label>
                 <input type="text" id="editThreadSubCat" class="m-input">
-                
+
                 <label class="m-label">Type</label>
                 <select id="editThreadType" class="m-input">
                     <option value="perpetual">Perpetual</option>
                     <option value="quest">Quest</option>
                     <option value="frog">Frog</option>
                 </select>
-                
+
                 <label class="m-label">Frequency</label>
                 <select id="editThreadCadence" class="m-input">
                     <option value="daily">Daily</option>
@@ -1343,15 +2401,15 @@ body.edit-mode .label-controls { display: flex !important; }
                 </select>
 
                 <label class="m-label">Time of Day</label>
-<select id="editThreadTime" class="m-input">
-    <option value="morning">🌅 Morning</option>
-    <option value="midday">☀️ Midday</option>
-    <option value="evening">🌆 Evening</option>
-    <option value="night">🌙 Night</option>
-    <option value="unspecified">❔ Unspecified</option>
-</select>
+                <select id="editThreadTime" class="m-input">
+                    <option value="morning">🌅 Morning</option>
+                    <option value="midday">☀️ Midday</option>
+                    <option value="evening">🌆 Evening</option>
+                    <option value="night">🌙 Night</option>
+                    <option value="unspecified">❔ Unspecified</option>
+                </select>
 
-                
+
             </div>
             <div class="modal-buttons">
                 <button class="modal-btn cancel" onclick="hideModalWindow('editThreadModal')">Cancel</button>
@@ -1359,28 +2417,39 @@ body.edit-mode .label-controls { display: flex !important; }
             </div>
         </div>
     </div>
-    
+
     <div class="modal" id="contextModal">
         <div class="modal-content">
             <div class="modal-title" id="contextTitle">Day Context</div>
-<div style="text-align: left; margin-bottom: 20px;">
+            <div style="text-align: left; margin-bottom: 20px;">
 
-    <label class="m-label">Work Priority</label><input type="text" id="ctxWork" value="{{ ctx.top_work }}" class="m-input">
-                <label class="m-label">Self Priority</label><input type="text" id="ctxOther" value="{{ ctx.top_other }}" class="m-input">
-                <label class="m-label">Project</label><input type="text" id="ctxProject" value="{{ ctx.project }}" class="m-input">
+                <label class="m-label">Work Priority</label><input type="text" id="ctxWork" value="{{ ctx.top_work }}"
+                    class="m-input">
+                <label class="m-label">Self Priority</label><input type="text" id="ctxOther" value="{{ ctx.top_other }}"
+                    class="m-input">
+                <label class="m-label">Project</label><input type="text" id="ctxProject" value="{{ ctx.project }}"
+                    class="m-input">
                 <label class="m-label">Twits (Day Log)</label>
-                <textarea id="ctxComments" class="m-input" readonly style="background: #f5f5f5; min-height: 60px; font-family: monospace; font-size: 11px; resize: vertical;" placeholder="Empty..."></textarea>
+                <textarea id="ctxComments" class="m-input" readonly
+                    style="background: #f5f5f5; min-height: 60px; font-family: monospace; font-size: 11px; resize: vertical;"
+                    placeholder="Empty..."></textarea>
                 <div style="margin-top: 15px;">
                     <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:500;">
                         <input type="checkbox" id="ctxMeds" {% if ctx.meds %}checked{% endif %}> Meds Taken
                     </label>
                 </div>
-                
-                <div style="margin-top: 15px; padding: 12px; background: #fff5f5; border: 1px solid #ffebee; border-radius: 6px;">
-                    <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color: #d32f2f;">
-                        <input type="checkbox" id="ctxOff" onchange="document.getElementById('ctxOffReason').style.display = this.checked ? 'block' : 'none';" {% if ctx.off_routine %}checked{% endif %}> OFF ROUTINE
+
+                <div
+                    style="margin-top: 15px; padding: 12px; background: #fff5f5; border: 1px solid #ffebee; border-radius: 6px;">
+                    <label
+                        style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color: #d32f2f;">
+                        <input type="checkbox" id="ctxOff"
+                            onchange="document.getElementById('ctxOffReason').style.display = this.checked ? 'block' : 'none';"
+                            {% if ctx.off_routine %}checked{% endif %}> OFF ROUTINE
                     </label>
-                    <input type="text" id="ctxOffReason" value="{{ ctx.off_reason }}" class="m-input" style="display:{% if ctx.off_routine %}block{% else %}none{% endif %}; margin-top:8px; margin-bottom:0;" placeholder="Reason (Sick/Holiday)...">
+                    <input type="text" id="ctxOffReason" value="{{ ctx.off_reason }}" class="m-input"
+                        style="display:{% if ctx.off_routine %}block{% else %}none{% endif %}; margin-top:8px; margin-bottom:0;"
+                        placeholder="Reason (Sick/Holiday)...">
                 </div>
             </div>
             <div class="modal-buttons">
@@ -1395,7 +2464,8 @@ body.edit-mode .label-controls { display: flex !important; }
         <div class="modal-content" style="max-width: 600px; width: 100%;">
             <div class="modal-title">Square Note</div>
             <div style="text-align: left; margin-bottom: 20px;">
-                <textarea id="standaloneSquareNote" class="m-input" placeholder="Add your note here..." style="min-height: 250px; resize: vertical; font-family: inherit; font-size: 14px; padding: 12px;"></textarea>
+                <textarea id="standaloneSquareNote" class="m-input" placeholder="Add your note here..."
+                    style="min-height: 250px; resize: vertical; font-family: inherit; font-size: 14px; padding: 12px;"></textarea>
             </div>
             <div class="modal-buttons">
                 <button class="modal-btn cancel" onclick="hideModalWindow('squareNoteModal')">Cancel</button>
@@ -1407,14 +2477,17 @@ body.edit-mode .label-controls { display: flex !important; }
     <div class="modal" id="loginModal">
         <div class="modal-content" style="max-width: 300px;">
             <div class="modal-title">Terminal Access</div>
-            <input type="password" id="authPassword" class="m-input" placeholder="Enter Password" onkeypress="if(event.key === 'Enter') submitAuth();">
-            <div id="loginError" style="color: #d32f2f; font-size: 12px; margin-bottom: 12px; display: none;">Access Denied. Wrong password.</div>
+            <input type="password" id="authPassword" class="m-input" placeholder="Enter Password"
+                onkeypress="if(event.key === 'Enter') submitAuth();">
+            <div id="loginError" style="color: #d32f2f; font-size: 12px; margin-bottom: 12px; display: none;">Access
+                Denied. Wrong password.</div>
             <div class="modal-buttons">
                 <button class="modal-btn cancel" onclick="hideModalWindow('loginModal')">Cancel</button>
                 <button class="modal-btn black" onclick="submitAuth()">Unlock</button>
             </div>
         </div>
     </div>
-    
+
 </body>
+
 </html>
