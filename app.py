@@ -335,7 +335,7 @@ def restore_from_json(json_content):
         for th in active_threads:
             recalculate_chains(th.thread_id)
             
-        return True, "Відновлено успішно."
+        return True, "Success."
     except Exception as e:
         return False, str(e)
 
@@ -477,7 +477,15 @@ def api_logout():
 @app.route('/')
 def index():
     try:
+        week_offset = request.args.get('offset', 0, type=int)
+        
         today = date.today()
+        start_of_current_week = today - timedelta(days=today.weekday())
+        
+        base_week = start_of_current_week + timedelta(weeks=week_offset)
+        
+        start_date = base_week - timedelta(days=35)
+        end_date = base_week + timedelta(days=6)
         cal = ensure_calendar_entry(today)
         
         recent_cals = Calendar.query.filter(
@@ -543,11 +551,6 @@ def index():
         threads = Thread.query.filter(Thread.status == 'active').order_by(Thread.rank.desc()).all()
         grouped_threads = {c: [] for c in categories}
         
-        start_of_current_week = today - timedelta(days=today.weekday())
-        
-        start_date = start_of_current_week - timedelta(days=35)
-        end_date = start_of_current_week + timedelta(days=6)
-        
         week_headers = []
         for i in range(6):
             w_start = start_date + timedelta(days=i*7)
@@ -580,7 +583,16 @@ def index():
             weeks = [days[i:i + 7] for i in range(0, len(days), 7)]
             grouped_threads[cat].append({'info': th, 'weeks': weeks})
             
-        return render_template('dashboard.html', grouped_threads=grouped_threads, categories=categories, ctx=ctx, today_date=today.strftime('%Y-%m-%d'), week_headers=week_headers, is_auth=session.get('logged_in', False))
+        return render_template(
+            'dashboard.html', 
+            grouped_threads=grouped_threads, 
+            categories=categories, 
+            ctx=ctx, 
+            today_date=today.strftime('%Y-%m-%d'), 
+            week_headers=week_headers, 
+            is_auth=session.get('logged_in', False),
+            current_offset=week_offset 
+        )
     except Exception as e: return f"CRITICAL ERROR: {str(e)}"
 
 @app.route('/api/get_day_info', methods=['POST'])
@@ -698,17 +710,30 @@ def edit_thread():
 @app.route('/api/move_thread', methods=['POST'])
 @login_required
 def move_thread():
-    t_id = request.json.get('id')
-    direction = request.json.get('direction')
+    data = request.json
+    t_id = data.get('id')
+    direction = data.get('direction')
+    mode = data.get('mode', 'type')
+    
     thread = db.session.get(Thread, t_id)
     if not thread: return jsonify({'success': False})
+    
+    query = Thread.query.filter(Thread.status == 'active')
+    
+    if mode == 'type':
+        query = query.filter(Thread.category == thread.category)
+    elif mode == 'time':
+        query = query.filter(Thread.time_of_day == thread.time_of_day)
+    
     if direction == 'up':
-        neighbor = Thread.query.filter(Thread.rank > thread.rank, Thread.status == 'active').order_by(Thread.rank.asc()).first()
+        neighbor = query.filter(Thread.rank > thread.rank).order_by(Thread.rank.asc()).first()
     else:
-        neighbor = Thread.query.filter(Thread.rank < thread.rank, Thread.status == 'active').order_by(Thread.rank.desc()).first()
+        neighbor = query.filter(Thread.rank < thread.rank).order_by(Thread.rank.desc()).first()
+        
     if neighbor:
         thread.rank, neighbor.rank = neighbor.rank, thread.rank
         db.session.commit()
+        
     return jsonify({'success': True})
 @app.route('/calendar')
 @login_required
