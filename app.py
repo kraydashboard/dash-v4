@@ -12,6 +12,7 @@ from sqlalchemy import func
 from flask_apscheduler import APScheduler
 from functools import wraps
 from flask import Flask, render_template, request, jsonify, send_file, session
+from zoneinfo import ZoneInfo
 
 app = Flask(__name__)
 # --- CONFIG ---
@@ -119,6 +120,17 @@ class IntentEntry(db.Model):
     entry_date = db.Column(db.Date, nullable=False)
     horizon = db.Column(db.String(20))
     content = db.Column(db.Text)
+    notes = db.Column(db.Text, default="")
+    plan = db.Column(db.Boolean, default=False)
+
+class ResilienceEntry(db.Model):
+    __tablename__ = 'resilience_entries'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, default=1) 
+    entry_date = db.Column(db.Date, nullable=False)
+    status = db.Column(db.String(20), default='baseline')
+    content = db.Column(db.Text)
+    notes = db.Column(db.Text, default="")
     
 class PartnerRequest(db.Model):
     __tablename__ = 'partner_requests'
@@ -264,8 +276,16 @@ def create_full_backup_json():
     data['intent_entries'] = [{
         'entry_date': str(e.entry_date),
         'horizon': e.horizon,
-        'content': e.content
+        'content': e.content,
+        'notes': e.notes,
+        'plan': e.plan
     } for e in IntentEntry.query.all()]
+    data['resilience_entries'] = [{
+        'entry_date': str(e.entry_date),
+        'status': e.status,
+        'content': e.content,
+        'notes': e.notes
+    } for e in ResilienceEntry.query.all()]
     return json.dumps(data, indent=2, ensure_ascii=False)
     
 
@@ -310,8 +330,19 @@ def restore_from_json(json_content):
             db.session.add(IntentEntry(
             entry_date=d_date,
             horizon=e.get('horizon'),
-            content=e.get('content')
+            content=e.get('content'),
+            notes=e.get('notes', ''),
+            plan=e.get('plan', False)
         ))
+            
+        for e in data.get('resilience_entries', []):
+            d_date = datetime.datetime.strptime(e['entry_date'], '%Y-%m-%d').date()
+            db.session.add(ResilienceEntry(
+                entry_date=d_date,
+                status=e.get('status', 'baseline'),
+                content=e.get('content', ''),
+                notes=e.get('notes', '')
+            ))
 
         for c in data.get('calendar', []):
             d_date = datetime.datetime.strptime(c['actual_date'], '%Y-%m-%d').date()
@@ -479,7 +510,7 @@ def index():
     try:
         week_offset = request.args.get('offset', 0, type=int)
         
-        today = date.today()
+        today = datetime.datetime.now(ZoneInfo("America/Chicago")).date()
         start_of_current_week = today - timedelta(days=today.weekday())
         
         base_week = start_of_current_week + timedelta(weeks=week_offset)
@@ -525,11 +556,8 @@ def index():
                 
             day_comments.reverse()
             global_parsed_comments.extend(day_comments)
-            
-            if len(global_parsed_comments) >= 5:
-                break
                 
-        parsed_comments = global_parsed_comments[:5]
+        parsed_comments = global_parsed_comments
 
         board_items = BoardItem.query.order_by(BoardItem.id.desc()).all()
         board_data = [{'id': b.id, 'text': b.text} for b in board_items]
@@ -621,7 +649,7 @@ def get_day_info():
 @login_required
 def update_day_context():
     data = request.json
-    cal = ensure_calendar_entry(date.today())
+    cal = ensure_calendar_entry(datetime.datetime.now(ZoneInfo("America/Chicago")).date())
     if 'top_work' in data: cal.top_work_priority = data['top_work']
     if 'top_other' in data: cal.top_other_priority = data['top_other']
     if 'project' in data: cal.project_type_this_week = data['project']
@@ -749,6 +777,18 @@ with app.app_context():
         db.session.commit()
     except Exception:
         db.session.rollback()
+    
+    try:
+        db.session.execute(db.text("ALTER TABLE intent_entries ADD COLUMN notes TEXT DEFAULT ''"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    try:
+        db.session.execute(db.text("ALTER TABLE intent_entries ADD COLUMN plan BOOLEAN DEFAULT FALSE"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
     if db.engine.name == 'postgresql':
         try:
@@ -777,33 +817,101 @@ if not any(t.name == "RequestBotThread" for t in threading.enumerate()):
     t2.daemon = True
     t2.start()
 
-@app.route('/api/calendar/<int:year>/<int:month>', methods=['GET'])
+@app.route('/api/calendar/<cal_type>/<int:year>/<int:month>', methods=['GET'])
 @login_required
-def get_intent_calendar_data(year, month):
+def get_calendar_data(cal_type, year, month):
     start_date = date(year, month + 1, 1)
     if month == 11:
         end_date = date(year + 1, 1, 1) - timedelta(days=1)
     else:
         end_date = date(year, month + 2, 1) - timedelta(days=1)
 
-    entries = IntentEntry.query.filter(IntentEntry.entry_date >= start_date, IntentEntry.entry_date <= end_date).all()
     data = {}
-    for e in entries:
-        day = e.entry_date.day
-        if day not in data: data[day] = []
-        data[day].append({"horizon": e.horizon, "text": e.content})
+    if cal_type == 'resilience':
+        entries = ResilienceEntry.query.filter(ResilienceEntry.entry_date >= start_date, ResilienceEntry.entry_date <= end_date).all()
+        for e in entries:
+            data[e.entry_date.day] = {"header": e.content or "", "notes": e.notes or "", "status": e.status or "baseline"}
+    else:
+        entries = IntentEntry.query.filter(IntentEntry.entry_date >= start_date, IntentEntry.entry_date <= end_date).all()
+        for e in entries:
+            db_horizon = e.horizon.strip() if e.horizon and e.horizon.strip() else "survival"
+            data[e.entry_date.day] = {"header": e.content or "", "notes": e.notes or "", "horizon": db_horizon, "plan": e.plan or False}
+    
     return jsonify(data)
 
-@app.route('/api/calendar/save', methods=['POST'])
+@app.route('/api/calendar/<cal_type>/save', methods=['POST'])
 @login_required
-def save_intent_calendar_data():
+def save_calendar_data(cal_type):
     req = request.json
     d_date = datetime.datetime.strptime(req.get('date'), '%Y-%m-%d').date()
-    IntentEntry.query.filter_by(entry_date=d_date).delete()
-    for seg in req.get('segments', []):
-        db.session.add(IntentEntry(entry_date=d_date, horizon=seg.get('horizon'), content=seg.get('text')))
+    
+    if cal_type == 'resilience':
+        ResilienceEntry.query.filter_by(entry_date=d_date).delete()
+        db.session.add(ResilienceEntry(
+            entry_date=d_date, 
+            status=req.get('status', 'baseline'),
+            content=req.get('header', ''),
+            notes=req.get('notes', '')
+        ))
+    else:
+        IntentEntry.query.filter_by(entry_date=d_date).delete()
+        db.session.add(IntentEntry(
+            entry_date=d_date, 
+            horizon=req.get('horizon', 'survival'),
+            content=req.get('header', ''),
+            notes=req.get('notes', ''),
+            plan=req.get('plan', False)
+        ))
+        
     db.session.commit()
     return jsonify({'success': True})
+
+@app.route('/api/delete_log', methods=['POST'])
+@login_required
+def delete_log():
+    data = request.json
+    d_str = data.get('date')
+    time_str = data.get('time', '')
+    text_to_delete = data.get('text', '').replace('\r\n', '\n').strip()
+
+    try:
+        d_date = datetime.datetime.strptime(d_str, '%Y-%m-%d').date()
+        cal = db.session.get(Calendar, d_date)
+        if cal and cal.comments:
+            lines = [line for line in cal.comments.split('\n') if line.strip()]
+            parsed = []
+            current_entry = None
+
+            for line in lines:
+                if line.startswith('[') and ']' in line:
+                    if current_entry:
+                        parsed.append(current_entry)
+                    end_idx = line.find(']')
+                    current_entry = {'time': line[1:end_idx], 'text': line[end_idx+1:].strip(), 'raw': [line]}
+                else:
+                    if current_entry:
+                        current_entry['text'] += '\n' + line
+                        current_entry['raw'].append(line)
+                    else:
+                        current_entry = {'time': '', 'text': line, 'raw': [line]}
+
+            if current_entry:
+                parsed.append(current_entry)
+
+            new_raw_lines = []
+            deleted = False
+            for p in parsed:
+                if not deleted and p['time'] == time_str and p['text'].strip() == text_to_delete:
+                    deleted = True 
+                else:
+                    new_raw_lines.extend(p['raw'])
+
+            cal.comments = '\n'.join(new_raw_lines)
+            db.session.commit()
+
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000, debug=False, use_reloader=False)
