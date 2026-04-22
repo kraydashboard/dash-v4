@@ -866,6 +866,45 @@ def save_calendar_data(cal_type):
     db.session.commit()
     return jsonify({'success': True})
 
+
+@app.route('/api/aggregate/<int:year>', methods=['GET'])
+@login_required
+def get_aggregate_data(year):
+    start_date = date(year, 1, 1)
+    end_date = date(year, 12, 31)
+
+    counts = db.session.query(
+        Thread.category,
+        Square.period,
+        func.count(Square.square_id)
+    ).join(Square, Thread.thread_id == Square.thread_id)\
+     .filter(Square.period >= start_date, Square.period <= end_date, Square.status == 'hit')\
+     .group_by(Thread.category, Square.period).all()
+
+    target_cats = ['work', 'quests', 'self care']
+    data = {cat: {} for cat in target_cats}
+
+    for cat, period, count in counts:
+        cat_lower = cat.lower() if cat else 'maintenance'
+        if cat_lower in data:
+            data[cat_lower][period.strftime('%Y-%m-%d')] = count
+
+    intent_entries = IntentEntry.query.filter(
+        IntentEntry.entry_date >= start_date,
+        IntentEntry.entry_date <= end_date
+    ).all()
+
+    intent_data = {}
+    for entry in intent_entries:
+        if entry.content or entry.notes:
+            intent_data[entry.entry_date.strftime('%Y-%m-%d')] = {
+                'horizon': entry.horizon or 'survival',
+                'plan': entry.plan or False
+            }
+            
+    data['intentionality'] = intent_data
+
+    return jsonify({'success': True, 'data': data, 'year': year})
 @app.route('/api/delete_log', methods=['POST'])
 @login_required
 def delete_log():
