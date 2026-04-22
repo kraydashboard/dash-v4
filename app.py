@@ -111,7 +111,7 @@ class BoardItem(db.Model):
     __tablename__ = 'board_items'
     id = db.Column(db.Integer, primary_key=True)
     text = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.datetime.now)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.datetime.now(ZoneInfo("America/Chicago")))
 
 class IntentEntry(db.Model):
     __tablename__ = 'intent_entries'
@@ -136,7 +136,7 @@ class PartnerRequest(db.Model):
     __tablename__ = 'partner_requests'
     id = db.Column(db.Integer, primary_key=True)
     text = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.datetime.now)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.datetime.now(ZoneInfo("America/Chicago")))
 
 def get_week_data(d_obj):
     year, week, day = d_obj.isocalendar()
@@ -657,7 +657,7 @@ def update_day_context():
     if 'off_routine' in data: cal.off_routine_flag = data['off_routine']
     if 'off_reason' in data: cal.off_routine_reason = data['off_reason']
     if 'comments' in data and data['comments']:
-        timestamp = datetime.datetime.now().strftime("%H:%M")
+        timestamp = datetime.datetime.now(ZoneInfo("America/Chicago")).strftime("%H:%M")
         new_entry = f"[{timestamp}] {data['comments']}"
         if cal.comments: cal.comments += "\n" + new_entry
         else: cal.comments = new_entry
