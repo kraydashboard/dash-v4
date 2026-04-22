@@ -203,7 +203,7 @@
             background: #444;
         }
 
-        /* RIGHT PANEL - Escape Velocity */
+        /* RIGHT PANEL */
         .right-panel {
             flex: 1;
             min-width: 280px;
@@ -1494,6 +1494,131 @@
         .task-entry:hover .log-delete-btn {
             display: block;
         }
+
+        /* --- Aggregate view --- */
+        .heat-container {
+            margin-bottom: 40px;
+            font-family: var(--sans);
+        }
+
+        .heat-title {
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 15px;
+            color: #1a1a1a;
+            letter-spacing: 0.5px;
+        }
+
+        .heat-wrapper {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            overflow-x: auto;
+            padding-bottom: 10px;
+        }
+
+        .heat-months {
+            display: flex;
+            position: relative;
+            height: 20px;
+            font-size: 11px;
+            color: #1a1a1a;
+            font-weight: 500;
+        }
+
+        .heat-grid {
+            display: grid;
+            grid-template-rows: repeat(7, 13px);
+            grid-auto-flow: column;
+            gap: 3px;
+        }
+
+        .heat-cell {
+            width: 13px;
+            height: 13px;
+            border-radius: 2px;
+            position: relative;
+            transition: transform 0.1s;
+        }
+
+        .heat-cell:not(.heat-out):hover {
+            transform: scale(1.2);
+            z-index: 10;
+            border: 1px solid rgba(0, 0, 0, 0.2);
+        }
+
+        .heat-dow {
+            display: grid;
+            grid-template-rows: repeat(7, 13px);
+            gap: 3px;
+            font-size: 9px;
+            color: #999;
+            padding-top: 20px;
+            line-height: 13px;
+            font-weight: 500;
+            text-align: right;
+            padding-right: 5px;
+        }
+
+        .heat-month-label {
+            position: absolute;
+            bottom: 2px;
+            padding-left: 4px;
+            border-left: 1px solid #d0d0d0;
+            height: 12px;
+            line-height: 12px;
+            color: #666;
+        }
+
+        .global-tooltip {
+            position: fixed;
+            background: rgba(26, 26, 26, 0.95);
+            color: #fff;
+            padding: 5px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            white-space: nowrap;
+            z-index: 99999;
+            pointer-events: none;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.15s ease;
+            font-family: var(--sans);
+            transform: translate(-50%, -100%);
+            margin-top: -8px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        .global-tooltip.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .heat-out {
+            background: transparent;
+            pointer-events: none;
+        }
+
+        .heat-0 {
+            background: #ebedf0;
+        }
+
+        .heat-1 {
+            background: #c6e48b;
+        }
+
+        .heat-2 {
+            background: #7bc96f;
+        }
+
+        .heat-3 {
+            background: #239a3b;
+        }
+
+        .heat-4 {
+            background: #196127;
+        }
     </style>
 
     <script>
@@ -1528,8 +1653,182 @@
             });
         }
 
+        async function loadAggregateData() {
+            const year = new Date().getFullYear();
+            try {
+                const response = await fetch(`/api/aggregate/${year}`);
+                const json = await response.json();
+                if (json.success) {
+                    renderAggregateView(json.data, year);
+                    window.aggregateDataLoaded = true;
+                }
+            } catch (e) {
+                console.error("Loading aggregate data error", e);
+            }
+        }
+
+        function setupTooltips() {
+            let tooltip = document.getElementById('global-tooltip');
+            if (!tooltip) {
+                tooltip = document.createElement('div');
+                tooltip.id = 'global-tooltip';
+                tooltip.className = 'global-tooltip';
+                document.body.appendChild(tooltip);
+            }
+
+            document.addEventListener('mouseover', function (e) {
+                if (e.target.classList.contains('heat-cell') && !e.target.classList.contains('heat-out')) {
+                    const info = e.target.getAttribute('data-info');
+                    if (info) {
+                        tooltip.innerText = info;
+                        const rect = e.target.getBoundingClientRect();
+
+                        tooltip.style.left = rect.left + (rect.width / 2) + 'px';
+                        tooltip.style.top = rect.top + 'px';
+
+                        tooltip.classList.add('visible');
+                    }
+                }
+            });
+
+            document.addEventListener('mouseout', function (e) {
+                if (e.target.classList.contains('heat-cell')) {
+                    tooltip.classList.remove('visible');
+                }
+            });
+
+            window.addEventListener('scroll', () => tooltip.classList.remove('visible'), true);
+        }
+
+        document.addEventListener('DOMContentLoaded', setupTooltips);
+
+        function renderAggregateView(data, year) {
+            const container = document.getElementById('aggregateContainer');
+            container.innerHTML = '';
+
+            const cats = ['WORK', 'QUESTS', 'SELF CARE', 'INTENTIONALITY'];
+
+            const startDate = new Date(year, 0, 1);
+
+            const dayOfWeek = startDate.getDay();
+            const offset = (dayOfWeek === 0) ? 6 : dayOfWeek - 1;
+            startDate.setDate(startDate.getDate() - offset);
+
+            const dates = [];
+            for (let i = 0; i < 53 * 7; i++) {
+                const d = new Date(startDate);
+                d.setDate(d.getDate() + i);
+                if (d.getFullYear() > year && i > 365 && d.getDay() === 1) break;
+                dates.push(d);
+            }
+
+            const CAL_HORIZONS_AGG = [
+                { id: "survival", label: "Survival", color: "#888" },
+                { id: "2wk", label: "2 wk", color: "#7dd3fc" },
+                { id: "1yr", label: "1 yr", color: "#3b82f6" },
+                { id: "5yr", label: "5 yr", color: "#d946ef" },
+                { id: "10yr", label: "10+ yr", color: "#f59e0b" }
+            ];
+
+            cats.forEach(catName => {
+                const isIntent = catName === 'INTENTIONALITY';
+                const catKey = catName.toLowerCase();
+                const catData = data[catKey] || {};
+
+                let maxHits = 0;
+                if (!isIntent) {
+                    Object.values(catData).forEach(v => { if (v > maxHits) maxHits = v; });
+                }
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'heat-container';
+                wrapper.innerHTML = `<div class="heat-title">${catName}</div>`;
+
+                const gridWrap = document.createElement('div');
+                gridWrap.className = 'heat-wrapper';
+
+                gridWrap.innerHTML += `<div class="heat-dow">
+            <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
+        </div>`;
+
+                const grid = document.createElement('div');
+                grid.className = 'heat-grid';
+
+                const monthLabels = [];
+                const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+                dates.forEach((d, index) => {
+                    if (d.getDate() === 1 && d.getFullYear() === year) {
+                        const colIndex = Math.floor(index / 7);
+                        monthLabels.push({ name: monthNames[d.getMonth()], col: colIndex });
+                    }
+
+                    const dateStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                    let isOut = d.getFullYear() !== year;
+
+                    const cell = document.createElement('div');
+                    cell.className = `heat-cell ${isOut ? 'heat-out' : ''}`;
+
+                    if (!isOut) {
+                        const niceDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+                        if (isIntent) {
+                            const dayData = catData[dateStr];
+                            if (dayData) {
+                                if (dayData.plan) {
+                                    cell.style.background = '#fafafa';
+                                    cell.style.border = '1px dashed #999';
+                                    cell.setAttribute('data-info', `Plan on ${niceDate}`);
+                                } else {
+                                    const hObj = CAL_HORIZONS_AGG.find(h => h.id === dayData.horizon);
+                                    if (hObj) {
+                                        cell.style.background = hObj.color;
+                                        cell.setAttribute('data-info', `${hObj.label} on ${niceDate}`);
+                                    }
+                                }
+                            } else {
+                                cell.classList.add('heat-0');
+                            }
+                        }
+                        else {
+                            const hits = catData[dateStr] || 0;
+                            let level = 0;
+                            if (hits > 0) {
+                                if (maxHits <= 4) level = hits;
+                                else level = Math.ceil((hits / maxHits) * 4);
+                                if (level > 4) level = 4;
+                            }
+                            cell.classList.add(`heat-${level}`);
+
+                            const taskWord = hits === 1 ? 'task' : 'tasks';
+                            cell.setAttribute('data-info', `${hits} ${taskWord} on ${niceDate}`);
+                        }
+                    }
+                    grid.appendChild(cell);
+                });
+
+                const monthsDiv = document.createElement('div');
+                monthsDiv.className = 'heat-months';
+                monthLabels.forEach(ml => {
+                    const span = document.createElement('span');
+                    span.className = 'heat-month-label';
+                    span.innerText = ml.name;
+                    span.style.left = `${ml.col * 16}px`;
+                    monthsDiv.appendChild(span);
+                });
+
+                const mainRight = document.createElement('div');
+                mainRight.appendChild(monthsDiv);
+                mainRight.appendChild(grid);
+
+                gridWrap.appendChild(mainRight);
+                wrapper.appendChild(gridWrap);
+                container.appendChild(wrapper);
+            });
+        }
+
         function setSortMode(mode) {
-            if (mode === 'calendar' && !IS_AUTH) {
+            if ((mode === 'calendar' || mode === 'aggregate') && !IS_AUTH) {
                 showModalWindow('loginModal');
                 return;
             }
@@ -1540,20 +1839,27 @@
                 b.classList.toggle('active', b.dataset.mode === mode);
             });
 
-            const calendarView = document.getElementById('calendarView');
+            const isMobile = window.innerWidth <= 768;
+
+            document.querySelectorAll('.grid-wrapper').forEach(w => {
+                w.style.setProperty('display', 'none', 'important');
+            });
+
             if (mode === 'calendar') {
-                document.querySelectorAll('.grid-wrapper').forEach(w => {
-                    if (w.id !== 'calendarView') w.style.setProperty('display', 'none', 'important');
-                });
-                if (calendarView) {
-                    calendarView.style.display = 'block';
+                const calView = document.getElementById('calendarView');
+                if (calView) {
+                    calView.style.display = 'block';
                     if (!window.calDataLoaded) { loadCalData(); window.calDataLoaded = true; }
                 }
+            } else if (mode === 'aggregate') {
+                const aggView = document.getElementById('aggregateView');
+                if (aggView) {
+                    aggView.style.display = 'block';
+                    if (!window.aggregateDataLoaded) { loadAggregateData(); }
+                }
             } else {
-                if (calendarView) calendarView.style.display = 'none';
-                const isMobile = window.innerWidth <= 768;
                 document.querySelectorAll('.grid-wrapper').forEach(w => {
-                    if (w.id === 'calendarView') return;
+                    if (w.id === 'calendarView' || w.id === 'aggregateView') return;
                     w.style.display = (isMobile && w.classList.contains('mobile-only')) || (!isMobile && w.classList.contains('desktop-only')) ? 'block' : 'none';
                 });
 
@@ -1857,6 +2163,8 @@
                     <button class="tgl-btn sort-tgl" data-mode="time" onclick="setSortMode('time')">By Time</button>
                     <button class="tgl-btn sort-tgl" data-mode="calendar"
                         onclick="setSortMode('calendar')">Calendar</button>
+                    <button class="tgl-btn sort-tgl" data-mode="aggregate"
+                        onclick="setSortMode('aggregate')">Aggregate</button>
                 </div>
 
                 {% if is_auth %}
@@ -2150,6 +2458,11 @@
                             <button class="modal-btn black" onclick="calSaveDay()" style="width: 100%;">Save</button>
                         </div>
                     </div>
+                </div>
+
+                <div id="aggregateView" class="grid-wrapper"
+                    style="display: none; padding: 20px 30px; background: #fff;">
+                    <div id="aggregateContainer"></div>
                 </div>
 
                 <script>
