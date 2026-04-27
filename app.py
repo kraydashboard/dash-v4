@@ -249,17 +249,20 @@ def create_full_backup_json():
     data = {}
     data['threads'] = [{
         'thread_id': t.thread_id, 'thread_name': t.thread_name, 'category': t.category,
-        'status': t.status, 'rank': t.rank, 'created_at': str(t.created_at),
-        'created_at_40k': t.created_at_40k, 'closed_date': str(t.closed_date) if t.closed_date else None,
+        'status': t.status, 'rank': t.rank, 
+        'created_at': t.created_at.strftime('%Y-%m-%d') if t.created_at else None,
+        'created_at_40k': t.created_at_40k, 'closed_date': t.closed_date.strftime('%Y-%m-%d') if t.closed_date else None,
         'sub_category': t.sub_category, 'type': t.type, 'cadence': t.cadence,
         'thread_name_redacted': t.thread_name_redacted,
         'time_of_day': t.time_of_day
     } for t in Thread.query.all()]
+    
     data['squares'] = [{
         'square_id': s.square_id, 'thread_id': s.thread_id, 'period': str(s.period), 
         'status': s.status, 'chain_id': s.chain_id, 'chain_start': s.chain_start,
         'chain_end': s.chain_end, 'chain_end_reason': s.chain_end_reason
     } for s in Square.query.filter(Square.status != 'empty').all()]
+    
     data['calendar'] = [{
         'actual_date': str(c.actual_date), 'date_40k': c.date_40k, 'week_40k': c.week_40k,
         'top_work_priority': c.top_work_priority, 'top_other_priority': c.top_other_priority,
@@ -267,41 +270,56 @@ def create_full_backup_json():
         'project_type_this_week': c.project_type_this_week, 'day_meds': c.day_meds,
         'comments': c.comments
     } for c in Calendar.query.all()]
-    data['board'] = [{'text': b.text} for b in BoardItem.query.all()]
+    
+    data['board'] = [{
+        'id': b.id, 'text': b.text, 
+        'created_at': b.created_at.isoformat() if b.created_at else None
+    } for b in BoardItem.query.all()]
+    
     data['chains'] = [{
         'chain_id': c.chain_id, 'thread_id': c.thread_id,
-        'chain_start_date': str(c.chain_start_date), 'chain_end_date': str(c.chain_end_date),
+        'chain_start_date': c.chain_start_date.strftime('%Y-%m-%d') if c.chain_start_date else None, 
+        'chain_end_date': c.chain_end_date.strftime('%Y-%m-%d') if c.chain_end_date else None,
         'duration': c.duration, 'end_reason': c.end_reason
     } for c in Chain.query.all()]
-    data['intent_entries'] = [{
-        'entry_date': str(e.entry_date),
-        'horizon': e.horizon,
-        'content': e.content,
-        'notes': e.notes,
-        'plan': e.plan
-    } for e in IntentEntry.query.all()]
-    data['resilience_entries'] = [{
-        'entry_date': str(e.entry_date),
-        'status': e.status,
-        'content': e.content,
-        'notes': e.notes
-    } for e in ResilienceEntry.query.all()]
-    return json.dumps(data, indent=2, ensure_ascii=False)
     
+    data['intent_entries'] = [{
+        'id': e.id, 'user_id': e.user_id, 'entry_date': str(e.entry_date),
+        'horizon': e.horizon, 'content': e.content, 'notes': e.notes, 'plan': e.plan
+    } for e in IntentEntry.query.all()]
+    
+    data['resilience_entries'] = [{
+        'id': e.id, 'user_id': e.user_id, 'entry_date': str(e.entry_date),
+        'status': e.status, 'content': e.content, 'notes': e.notes
+    } for e in ResilienceEntry.query.all()]
+
+    data['bot_users'] = [{
+        'chat_id': u.chat_id, 'role': u.role
+    } for u in BotUser.query.all()]
+    
+    data['partner_requests'] = [{
+        'id': r.id, 'text': r.text, 
+        'created_at': r.created_at.isoformat() if r.created_at else None
+    } for r in PartnerRequest.query.all()]
+
+    return json.dumps(data, indent=2, ensure_ascii=False)   
 
 def restore_from_json(json_content):
     try:
         data = json.loads(json_content)
+        
         db.session.query(Square).delete()
         db.session.query(Chain).delete()
         db.session.query(BoardItem).delete()
         db.session.query(Calendar).delete()
         db.session.query(Thread).delete()
         db.session.query(IntentEntry).delete()
-        db.session.commit()
+        db.session.query(ResilienceEntry).delete() 
+        db.session.query(BotUser).delete()         
+        db.session.query(PartnerRequest).delete()  
         
         for t in data.get('threads', []):
-            dt = datetime.datetime.strptime(t['created_at'], '%Y-%m-%d').date()
+            dt = datetime.datetime.strptime(t['created_at'], '%Y-%m-%d').date() if t.get('created_at') else None
             closed = datetime.datetime.strptime(t['closed_date'], '%Y-%m-%d').date() if t.get('closed_date') else None
             th = Thread(
                 thread_id=t['thread_id'], thread_name=t['thread_name'], category=t['category'],
@@ -312,13 +330,22 @@ def restore_from_json(json_content):
                 time_of_day=t.get('time_of_day', 'unspecified')
             )
             db.session.add(th)
-        db.session.commit() 
-        
+            
+        for c in data.get('chains', []):
+            start_date = datetime.datetime.strptime(c['chain_start_date'], '%Y-%m-%d').date() if c.get('chain_start_date') else None
+            end_date = datetime.datetime.strptime(c['chain_end_date'], '%Y-%m-%d').date() if c.get('chain_end_date') else None
+            chain = Chain(
+                chain_id=c['chain_id'], thread_id=c['thread_id'],
+                chain_start_date=start_date, chain_end_date=end_date,
+                duration=c['duration'], end_reason=c.get('end_reason', "")
+            )
+            db.session.add(chain)
+
         for s in data.get('squares', []):
             d_date = datetime.datetime.strptime(s['period'], '%Y-%m-%d').date()
             sq = Square(
                 square_id=s['square_id'], thread_id=s['thread_id'], period=d_date,
-                status=s['status'], chain_id=None,
+                status=s['status'], chain_id=s.get('chain_id'), 
                 chain_start=s.get('chain_start', False),
                 chain_end=s.get('chain_end', False), 
                 chain_end_reason=s.get('chain_end_reason', "")
@@ -328,19 +355,16 @@ def restore_from_json(json_content):
         for e in data.get('intent_entries', []):
             d_date = datetime.datetime.strptime(e['entry_date'], '%Y-%m-%d').date()
             db.session.add(IntentEntry(
-            entry_date=d_date,
-            horizon=e.get('horizon'),
-            content=e.get('content'),
-            notes=e.get('notes', ''),
-            plan=e.get('plan', False)
-        ))
+                id=e.get('id'), user_id=e.get('user_id', 1), entry_date=d_date,
+                horizon=e.get('horizon'), content=e.get('content'),
+                notes=e.get('notes', ''), plan=e.get('plan') or False
+            ))
             
         for e in data.get('resilience_entries', []):
             d_date = datetime.datetime.strptime(e['entry_date'], '%Y-%m-%d').date()
             db.session.add(ResilienceEntry(
-                entry_date=d_date,
-                status=e.get('status', 'baseline'),
-                content=e.get('content', ''),
+                id=e.get('id'), user_id=e.get('user_id', 1), entry_date=d_date,
+                status=e.get('status', 'baseline'), content=e.get('content', ''),
                 notes=e.get('notes', '')
             ))
 
@@ -358,17 +382,43 @@ def restore_from_json(json_content):
             db.session.add(cal)
             
         for b in data.get('board', []):
-            db.session.add(BoardItem(text=b['text']))
+            c_at = datetime.datetime.fromisoformat(b['created_at']) if b.get('created_at') else datetime.datetime.now(ZoneInfo("America/Chicago"))
+            db.session.add(BoardItem(id=b.get('id'), text=b['text'], created_at=c_at))
+            
+        for u in data.get('bot_users', []):
+            db.session.add(BotUser(chat_id=u['chat_id'], role=u['role']))
+            
+        for r in data.get('partner_requests', []):
+            c_at = datetime.datetime.fromisoformat(r['created_at']) if r.get('created_at') else datetime.datetime.now(ZoneInfo("America/Chicago"))
+            db.session.add(PartnerRequest(id=r.get('id'), text=r['text'], created_at=c_at))
             
         db.session.commit()
         
-        active_threads = Thread.query.all()
-        for th in active_threads:
-            recalculate_chains(th.thread_id)
+        if db.engine.name == 'postgresql':
+            tables_to_sync = [
+                ('threads', 'thread_id'),
+                ('board_items', 'id'),
+                ('intent_entries', 'id'),
+                ('resilience_entries', 'id'),
+                ('partner_requests', 'id')
+            ]
+            for table, pk in tables_to_sync:
+                try:
+                    query = f"SELECT setval(pg_get_serial_sequence('{table}', '{pk}'), COALESCE((SELECT MAX({pk}) FROM {table}), 1))"
+                    db.session.execute(db.text(query))
+                except Exception as sync_e:
+                    print(f"Failed to sync sequence for {table}: {sync_e}")
+            db.session.commit()
+
+        if not data.get('chains'):
+            active_threads = Thread.query.all()
+            for th in active_threads:
+                recalculate_chains(th.thread_id)
             
         return True, "Success."
     except Exception as e:
-        return False, str(e)
+        db.session.rollback()
+        return False, str(e)    
 
 def send_scheduled_backup():
     try:
@@ -575,7 +625,7 @@ def index():
             'week_40k': cal.week_40k
         }
 
-        categories = ['work', 'maintenance', 'family', 'quests', 'self care']
+        categories = ['work', 'scaffolding', 'family', 'quests', 'self care']
         threads = Thread.query.filter(Thread.status == 'active').order_by(Thread.rank.desc()).all()
         grouped_threads = {c: [] for c in categories}
         
@@ -590,7 +640,7 @@ def index():
         sq_map = {(s.thread_id, s.period): s for s in all_squares}
         
         for th in threads:
-            cat = th.category if th.category in grouped_threads else 'maintenance'
+            cat = th.category if th.category in grouped_threads else 'scaffolding'
             days = []
             
             for i in range(42):
@@ -885,7 +935,7 @@ def get_aggregate_data(year):
     data = {cat: {} for cat in target_cats}
 
     for cat, period, count in counts:
-        cat_lower = cat.lower() if cat else 'maintenance'
+        cat_lower = cat.lower() if cat else 'scaffolding'
         if cat_lower in data:
             data[cat_lower][period.strftime('%Y-%m-%d')] = count
 
