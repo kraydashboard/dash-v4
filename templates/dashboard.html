@@ -715,28 +715,31 @@
             font-weight: 600;
         }
 
-        .habit-cell[data-reason]:not(.completed):not(.miss) {
-            background: #e3f2fd;
-            border-color: #90caf9;
+        .habit-cell[data-reason] {
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        .habit-cell.completed[data-reason] {
-            background: #153e75;
-            border-color: #153e75;
+        .habit-cell[data-reason]::before {
+            content: "T";
+            font-family: var(--sans);
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 1;
         }
 
-        .habit-cell.completed.past-week[data-reason] {
-            background: #547fb0;
-            border-color: #547fb0;
+        .habit-cell[data-reason]:not(.completed):not(.miss)::before {
+            color: #1a1a1a;
         }
 
-        .habit-cell.miss[data-reason] {
-            background: repeating-linear-gradient(45deg,
-                    #153e75,
-                    #153e75 2px,
-                    #ffffff 2px,
-                    #ffffff 4px);
-            border-color: #153e75;
+        .habit-cell.completed[data-reason]::before {
+            color: #ffffff;
+        }
+
+        .habit-cell.miss[data-reason]::before {
+            color: #d32f2f;
+            text-shadow: 0px 0px 2px rgba(255, 255, 255, 0.9);
         }
 
         .action-buttons {
@@ -1864,24 +1867,14 @@
                 });
 
                 const typeHeaders = document.querySelectorAll('.type-header');
-                const timeHeaders = document.querySelectorAll('.time-header');
                 const labels = document.querySelectorAll('.habit-label');
                 const cells = document.querySelectorAll('.habit-cell');
 
                 const typeMap = { 'work': 10000, 'scaffolding': 20000, 'family': 30000, 'quests': 35000, 'self care': 40000 };
-                const timeMap = { 'morning': 10000, 'midday': 20000, 'evening': 30000, 'night': 40000, 'unspecified': 50000 };
 
-                if (mode === 'type') {
-                    typeHeaders.forEach(h => { h.style.display = 'flex'; h.style.order = typeMap[h.dataset.cat] || 90000; });
-                    timeHeaders.forEach(h => h.style.display = 'none');
-                    labels.forEach(l => { l.style.order = (typeMap[l.dataset.cat] || 90000) + (1000 - parseInt(l.dataset.rank)); });
-                    cells.forEach(c => { c.style.order = (typeMap[c.dataset.cat] || 90000) + (1000 - parseInt(c.dataset.rank)); });
-                } else {
-                    typeHeaders.forEach(h => h.style.display = 'none');
-                    timeHeaders.forEach(h => { h.style.display = 'flex'; h.style.order = timeMap[h.dataset.time] || 90000; });
-                    labels.forEach(l => { l.style.order = (timeMap[l.dataset.time] || 50000) + (1000 - parseInt(l.dataset.rank)); });
-                    cells.forEach(c => { c.style.order = (timeMap[c.dataset.time] || 50000) + (1000 - parseInt(c.dataset.rank)); });
-                }
+                typeHeaders.forEach(h => { h.style.display = 'flex'; h.style.order = typeMap[h.dataset.cat] || 90000; });
+                labels.forEach(l => { l.style.order = (typeMap[l.dataset.cat] || 90000) + (1000 - parseInt(l.dataset.rank)); });
+                cells.forEach(c => { c.style.order = (typeMap[c.dataset.cat] || 90000) + (1000 - parseInt(c.dataset.rank)); });
             }
         }
 
@@ -1911,16 +1904,10 @@
             }
         }
         function moveThread(id, direction) {
-            const mode = localStorage.getItem('habitSortMode') || 'type';
-
             fetch('/api/move_thread', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    id: id,
-                    direction: direction,
-                    mode: mode
-                })
+                body: JSON.stringify({ id: id, direction: direction })
             }).then(() => location.reload());
         }
 
@@ -2095,7 +2082,7 @@
 
             const savedSortMode = localStorage.getItem('habitSortMode');
             if (savedSortMode) {
-                if (savedSortMode === 'calendar' && !IS_AUTH) {
+                if ((savedSortMode === 'calendar' && !IS_AUTH) || savedSortMode === 'time') {
                     setSortMode('type');
                 } else {
                     setSortMode(savedSortMode);
@@ -2158,13 +2145,12 @@
 
             <div class="controls">
                 <div class="toggle-group">
-                    <button class="tgl-btn sort-tgl active" data-mode="type" onclick="setSortMode('type')">By
-                        Type</button>
-                    <button class="tgl-btn sort-tgl" data-mode="time" onclick="setSortMode('time')">By Time</button>
+                    <button class="tgl-btn sort-tgl" data-mode="aggregate"
+                        onclick="setSortMode('aggregate')">Helicopter</button>
+                    <button class="tgl-btn sort-tgl active" data-mode="type" 
+                        onclick="setSortMode('type')">Tracker</button>
                     <button class="tgl-btn sort-tgl" data-mode="calendar"
                         onclick="setSortMode('calendar')">Calendar</button>
-                    <button class="tgl-btn sort-tgl" data-mode="aggregate"
-                        onclick="setSortMode('aggregate')">Aggregate</button>
                 </div>
 
                 {% if is_auth %}
@@ -2284,17 +2270,16 @@
 
                         {% for item in grouped_threads[cat] %}
                         {% set ns_sort.idx = ns_sort.idx + 1 %}
-                        {% set t_time = item.info.time_of_day if item.info.time_of_day else 'unspecified' %}
 
                         <div class="habit-label" data-idx="{{ ns_sort.idx }}" data-cat="{{ cat }}"
-                            data-time="{{ t_time }}" data-rank="{{ item.info.rank }}"> <span class="habit-name">{{
+                            data-rank="{{ item.info.rank }}"> <span class="habit-name">{{
                                 item.info.thread_name }}</span>
                             <div class="label-controls">
                                 <button class="l-btn" onclick="moveThread('{{ item.info.thread_id }}', 'up')">↑</button>
                                 <button class="l-btn"
                                     onclick="moveThread('{{ item.info.thread_id }}', 'down')">↓</button>
                                 <button class="l-btn"
-                                    onclick="openEditModal('{{ item.info.thread_id }}', '{{ item.info.thread_name }}', '{{ item.info.thread_name_redacted or '' }}', '{{ item.info.sub_category or '' }}', '{{ item.info.type }}', '{{ item.info.cadence }}', '{{ t_time }}')">✎</button>
+                                    onclick="openEditModal('{{ item.info.thread_id }}', '{{ item.info.thread_name }}', '{{ item.info.thread_name_redacted or '' }}', '{{ item.info.sub_category or '' }}', '{{ item.info.type }}', '{{ item.info.cadence }}')">✎</button>
                                 <button class="l-btn red"
                                     onclick="deleteThread('{{ item.info.thread_id }}', '{{ item.info.thread_name }}')">×</button>
                             </div>
@@ -2311,7 +2296,7 @@
                             style="grid-column: {{ current_col }};" data-id="{{ item.info.thread_id }}"
                             data-date="{{ day.date }}" data-rank="{{ item.info.rank }}" data-status="{{ day.status }}"
                             data-week="{{ w_idx }}" data-idx="{{ ns_sort.idx }}" data-cat="{{ cat }}"
-                            data-time="{{ t_time }}" {% if day.miss_reason %}data-reason="{{ day.miss_reason }}" {%
+                            {% if day.miss_reason %}data-reason="{{ day.miss_reason }}" {%
                             endif %} onclick="handleCellClick(this)" oncontextmenu="handleRightClick(event, this)">
                         </div>
                         {% endfor %}
@@ -2319,14 +2304,6 @@
                         {% endfor %}
                         {% endfor %}
 
-                        {% set time_keys = ['morning', 'midday', 'evening', 'night', 'unspecified'] %}
-                        {% set time_labels = {'morning': '🌅 Morning', 'midday': '☀️ Midday', 'evening': '🌆 Evening',
-                        'night': '🌙 Night', 'unspecified': '❔ Unspecified'} %}
-                        {% for t_key in time_keys %}
-                        <div class="time-group-header time-header" data-time="{{ t_key }}" style="display:none;">
-                            <span class="time-group-label">{{ time_labels[t_key] }}</span>
-                        </div>
-                        {% endfor %}
                     </div>
                 </div>
 
@@ -2360,17 +2337,16 @@
 
                         {% for item in grouped_threads[cat] %}
                         {% set ns_sort.idx = ns_sort.idx + 1 %}
-                        {% set t_time = item.info.time_of_day if item.info.time_of_day else 'unspecified' %}
 
                         <div class="habit-label" data-idx="{{ ns_sort.idx }}" data-cat="{{ cat }}"
-                            data-time="{{ t_time }}" data-rank="{{ item.info.rank }}">
+                            data-rank="{{ item.info.rank }}">
                             <span class="habit-name">{{ item.info.thread_name }}</span>
                             <div class="label-controls">
                                 <button class="l-btn" onclick="moveThread('{{ item.info.thread_id }}', 'up')">↑</button>
                                 <button class="l-btn"
                                     onclick="moveThread('{{ item.info.thread_id }}', 'down')">↓</button>
                                 <button class="l-btn"
-                                    onclick="openEditModal('{{ item.info.thread_id }}', '{{ item.info.thread_name }}', '{{ item.info.thread_name_redacted or '' }}', '{{ item.info.sub_category or '' }}', '{{ item.info.type }}', '{{ item.info.cadence }}', '{{ t_time }}')">✎</button>
+                                    onclick="openEditModal('{{ item.info.thread_id }}', '{{ item.info.thread_name }}', '{{ item.info.thread_name_redacted or '' }}', '{{ item.info.sub_category or '' }}', '{{ item.info.type }}', '{{ item.info.cadence }}')">✎</button>
                                 <button class="l-btn red"
                                     onclick="deleteThread('{{ item.info.thread_id }}', '{{ item.info.thread_name }}')">×</button>
                             </div>
@@ -2383,19 +2359,11 @@
                             style="grid-column: {{ current_col }};" data-id="{{ item.info.thread_id }}"
                             data-date="{{ day.date }}" data-rank="{{ item.info.rank }}" data-status="{{ day.status }}"
                             data-week="{{ item.weeks|length - 1 }}" data-idx="{{ ns_sort.idx }}" data-cat="{{ cat }}"
-                            data-time="{{ t_time }}" {% if day.miss_reason %}data-reason="{{ day.miss_reason }}" {%
+                            {% if day.miss_reason %}data-reason="{{ day.miss_reason }}" {%
                             endif %} onclick="handleCellClick(this)" oncontextmenu="handleRightClick(event, this)">
                         </div>
                         {% endfor %}
                         {% endfor %}
-                        {% endfor %}
-                        {% set time_keys = ['morning', 'midday', 'evening', 'night', 'unspecified'] %}
-                        {% set time_labels = {'morning': '🌅 Morning', 'midday': '☀️ Midday', 'evening': '🌆 Evening',
-                        'night': '🌙 Night', 'unspecified': '❔ Unspecified'} %}
-                        {% for t_key in time_keys %}
-                        <div class="time-group-header time-header" data-time="{{ t_key }}" style="display:none;">
-                            <span class="time-group-label">{{ time_labels[t_key] }}</span>
-                        </div>
                         {% endfor %}
                     </div>
                 </div>
@@ -2853,14 +2821,6 @@
                     <option value="monthly">Monthly</option>
                     <option value="quarterly">Seasonally</option>
                     <option value="yearly">Yearly</option>
-                </select>
-                <label class="m-label">Time of Day</label>
-                <select id="newThreadTime" class="m-input">
-                    <option value="morning">🌅 Morning</option>
-                    <option value="midday">☀️ Midday</option>
-                    <option value="evening">🌆 Evening</option>
-                    <option value="night">🌙 Night</option>
-                    <option value="unspecified" selected>❔ Unspecified</option>
                 </select>
             </div>
             <div class="modal-buttons">
