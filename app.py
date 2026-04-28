@@ -105,6 +105,18 @@ class Calendar(db.Model):
     project_type_this_week = db.Column(db.String(100), default="") 
     day_meds = db.Column(db.Boolean, default=False) 
     comments = db.Column(db.Text, default="") 
+    bh_hydroxizine = db.Column(db.Boolean, default=False)
+    bh_ritalin = db.Column(db.Boolean, default=False)
+    bh_modafinil = db.Column(db.Boolean, default=False)
+    bh_caffeine = db.Column(db.Boolean, default=False)
+    bh_alcohol = db.Column(db.Boolean, default=False)
+    bh_thc = db.Column(db.Boolean, default=False)
+
+class WeekContext(db.Model):
+    __tablename__ = 'week_contexts'
+    week_id = db.Column(db.String(20), primary_key=True)
+    header = db.Column(db.Text, default="")
+    notes = db.Column(db.Text, default="")
 
 class BoardItem(db.Model):
     __tablename__ = 'board_items'
@@ -246,6 +258,9 @@ def is_day_fulfilled(thread, date_obj, squares_map):
         
 def create_full_backup_json():
     data = {}
+    data['week_contexts'] = [{
+        'week_id': w.week_id, 'header': w.header, 'notes': w.notes
+    } for w in WeekContext.query.all()]
     data['threads'] = [{
         'thread_id': t.thread_id, 'thread_name': t.thread_name, 'category': t.category,
         'status': t.status, 'rank': t.rank, 
@@ -305,7 +320,7 @@ def create_full_backup_json():
 def restore_from_json(json_content):
     try:
         data = json.loads(json_content)
-        
+        db.session.query(WeekContext).delete()
         db.session.query(Square).delete()
         db.session.query(Chain).delete()
         db.session.query(BoardItem).delete()
@@ -315,6 +330,9 @@ def restore_from_json(json_content):
         db.session.query(ResilienceEntry).delete() 
         db.session.query(BotUser).delete()         
         db.session.query(PartnerRequest).delete()  
+
+        for w in data.get('week_contexts', []):
+            db.session.add(WeekContext(week_id=w['week_id'], header=w.get('header', ''), notes=w.get('notes', '')))
         
         for t in data.get('threads', []):
             dt = datetime.datetime.strptime(t['created_at'], '%Y-%m-%d').date() if t.get('created_at') else None
@@ -552,6 +570,35 @@ def api_logout():
     session.pop('logged_in', None)
     return jsonify({'success': True})
 
+@app.route('/api/get_week_info', methods=['POST'])
+def get_week_info():
+    week_id = request.json.get('week_id')
+    try:
+        wc = db.session.get(WeekContext, week_id)
+        if wc:
+            return jsonify({'success': True, 'header': wc.header, 'notes': wc.notes})
+        return jsonify({'success': True, 'header': '', 'notes': ''})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/update_week_context', methods=['POST'])
+@login_required
+def update_week_context():
+    data = request.json
+    week_id = data.get('week_id')
+    try:
+        wc = db.session.get(WeekContext, week_id)
+        if not wc:
+            wc = WeekContext(week_id=week_id)
+            db.session.add(wc)
+        
+        wc.header = data.get('header', '')
+        wc.notes = data.get('notes', '')
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
 @app.route('/')
 def index():
     try:
@@ -561,6 +608,9 @@ def index():
         start_of_current_week = today - timedelta(days=today.weekday())
         
         base_week = start_of_current_week + timedelta(weeks=week_offset)
+
+        iso_year, iso_week, _ = base_week.isocalendar()
+        current_week_id = f"{iso_year}-W{iso_week:02d}"
         
         start_date = base_week - timedelta(days=35)
         end_date = base_week + timedelta(days=6)
@@ -609,13 +659,24 @@ def index():
         board_items = BoardItem.query.order_by(BoardItem.id.desc()).all()
         board_data = [{'id': b.id, 'text': b.text} for b in board_items]
 
+        intent_today = IntentEntry.query.filter_by(entry_date=today).first()
+        resil_today = ResilienceEntry.query.filter_by(entry_date=today).first()
+
         ctx = {
-            'top_work': cal.top_work_priority or "",
-            'top_other': cal.top_other_priority or "",
-            'project': cal.project_type_this_week or "",
-            'meds': cal.day_meds,
             'off_routine': cal.off_routine_flag,
             'off_reason': cal.off_routine_reason or "",
+            'bh_hydroxizine': cal.bh_hydroxizine,
+            'bh_ritalin': cal.bh_ritalin,
+            'bh_modafinil': cal.bh_modafinil,
+            'bh_caffeine': cal.bh_caffeine,
+            'bh_alcohol': cal.bh_alcohol,
+            'bh_thc': cal.bh_thc,
+            'intent_horizon': intent_today.horizon if intent_today else 'survival',
+            'intent_header': intent_today.content if intent_today else '',
+            'intent_notes': intent_today.notes if intent_today else '',
+            'resil_status': resil_today.status if resil_today else 'baseline',
+            'resil_header': resil_today.content if resil_today else '',
+            'resil_notes': resil_today.notes if resil_today else '',
             'comment_list': parsed_comments,
             'board_data': board_data,
             'date_40k': cal.date_40k,
@@ -629,8 +690,11 @@ def index():
         week_headers = []
         for i in range(6):
             w_start = start_date + timedelta(days=i*7)
+            iso_year, iso_week, _ = w_start.isocalendar()
+            w_id = f"{iso_year}-W{iso_week:02d}"
             _, w_str = get_week_data(w_start)
-            week_headers.append(w_str)
+            
+            week_headers.append({'id': w_id, 'label': w_str})
         
         off_routine_days = {c.actual_date: True for c in Calendar.query.filter(Calendar.off_routine_flag == True).all()}
         all_squares = Square.query.filter(Square.period >= start_date, Square.period <= end_date).all()
@@ -666,9 +730,11 @@ def index():
             today_date=today.strftime('%Y-%m-%d'), 
             week_headers=week_headers, 
             is_auth=session.get('logged_in', False),
-            current_offset=week_offset 
+            current_offset=week_offset,
+            current_week_id=current_week_id 
         )
     except Exception as e: return f"CRITICAL ERROR: {str(e)}"
+    
 
 @app.route('/api/get_day_info', methods=['POST'])
 def get_day_info():
@@ -676,19 +742,26 @@ def get_day_info():
     try:
         d_date = datetime.datetime.strptime(d_str, '%Y-%m-%d').date()
         cal = db.session.get(Calendar, d_date)
-        if cal:
-            return jsonify({
-                'success': True,
-                'comments': cal.comments or "",
-                'work': cal.top_work_priority or "",
-                'other': cal.top_other_priority or "",
-                'project': cal.project_type_this_week or "",
-                'meds': cal.day_meds,
-                'off': cal.off_routine_flag,
-                'off_reason': cal.off_routine_reason or ""
-            })
-        else:
-            return jsonify({'success': True, 'comments': "No data for this day.", 'work':"", 'other':"", 'project':"", 'meds':False, 'off':False, 'off_reason':""})
+        intent = IntentEntry.query.filter_by(entry_date=d_date).first()
+        resil = ResilienceEntry.query.filter_by(entry_date=d_date).first()
+
+        return jsonify({
+            'success': True,
+            'off': cal.off_routine_flag if cal else False,
+            'off_reason': cal.off_routine_reason if cal else "",
+            'bh_hydroxizine': cal.bh_hydroxizine if cal else False,
+            'bh_ritalin': cal.bh_ritalin if cal else False,
+            'bh_modafinil': cal.bh_modafinil if cal else False,
+            'bh_caffeine': cal.bh_caffeine if cal else False,
+            'bh_alcohol': cal.bh_alcohol if cal else False,
+            'bh_thc': cal.bh_thc if cal else False,
+            'intent_horizon': intent.horizon if intent else 'survival',
+            'intent_header': intent.content if intent else '',
+            'intent_notes': intent.notes if intent else '',
+            'resil_status': resil.status if resil else 'baseline',
+            'resil_header': resil.content if resil else '',
+            'resil_notes': resil.notes if resil else ''
+        })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
@@ -696,18 +769,47 @@ def get_day_info():
 @login_required
 def update_day_context():
     data = request.json
-    cal = ensure_calendar_entry(datetime.datetime.now(ZoneInfo("America/Chicago")).date())
-    if 'top_work' in data: cal.top_work_priority = data['top_work']
-    if 'top_other' in data: cal.top_other_priority = data['top_other']
-    if 'project' in data: cal.project_type_this_week = data['project']
-    if 'meds' in data: cal.day_meds = data['meds']
+    d_str = data.get('date')
+    if d_str:
+        today_date = datetime.datetime.strptime(d_str, '%Y-%m-%d').date()
+    else:
+        today_date = datetime.datetime.now(ZoneInfo("America/Chicago")).date()
+    cal = ensure_calendar_entry(today_date)
+    
     if 'off_routine' in data: cal.off_routine_flag = data['off_routine']
     if 'off_reason' in data: cal.off_routine_reason = data['off_reason']
+    
+    if 'bh_hydroxizine' in data: cal.bh_hydroxizine = data['bh_hydroxizine']
+    if 'bh_ritalin' in data: cal.bh_ritalin = data['bh_ritalin']
+    if 'bh_modafinil' in data: cal.bh_modafinil = data['bh_modafinil']
+    if 'bh_caffeine' in data: cal.bh_caffeine = data['bh_caffeine']
+    if 'bh_alcohol' in data: cal.bh_alcohol = data['bh_alcohol']
+    if 'bh_thc' in data: cal.bh_thc = data['bh_thc']
+
+    if 'intent_horizon' in data:
+        intent = IntentEntry.query.filter_by(entry_date=today_date).first()
+        if not intent:
+            intent = IntentEntry(entry_date=today_date)
+            db.session.add(intent)
+        intent.horizon = data.get('intent_horizon', 'survival')
+        intent.content = data.get('intent_header', '')
+        intent.notes = data.get('intent_notes', '')
+
+    if 'resil_status' in data:
+        resil = ResilienceEntry.query.filter_by(entry_date=today_date).first()
+        if not resil:
+            resil = ResilienceEntry(entry_date=today_date)
+            db.session.add(resil)
+        resil.status = data.get('resil_status', 'baseline')
+        resil.content = data.get('resil_header', '')
+        resil.notes = data.get('resil_notes', '')
+
     if 'comments' in data and data['comments']:
         timestamp = datetime.datetime.now(ZoneInfo("America/Chicago")).strftime("%H:%M")
         new_entry = f"[{timestamp}] {data['comments']}"
         if cal.comments: cal.comments += "\n" + new_entry
         else: cal.comments = new_entry
+        
     db.session.commit()
     return jsonify({'success': True})
 
@@ -811,6 +913,13 @@ def calendar():
 # --- STARTUP LOGIC ---
 with app.app_context():
     db.create_all()
+
+    for col in ['bh_hydroxizine', 'bh_ritalin', 'bh_modafinil', 'bh_caffeine', 'bh_alcohol', 'bh_thc']:
+        try:
+            db.session.execute(db.text(f"ALTER TABLE calendar ADD COLUMN {col} BOOLEAN DEFAULT FALSE"))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
     
     try:
         db.session.execute(db.text("ALTER TABLE intent_entries ADD COLUMN notes TEXT DEFAULT ''"))
