@@ -412,6 +412,15 @@
             font-size: 9px;
             font-weight: 500;
             color: #888;
+            cursor: pointer;
+            transition: all 0.1s ease;
+            padding: 2px 0;
+        }
+
+        .day-date:hover {
+            color: #1a1a1a;
+            font-weight: 700;
+            transform: scale(1.2);
         }
 
         .day-letter {
@@ -755,6 +764,92 @@
             display: none;
         }
 
+        .grid-nav-btn.on {
+            background: #fff8e1;
+            border-color: #f0c040;
+        }
+
+        .day-context-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .dc-box {
+            background: #fff;
+            border: 1.5px solid #1a1a1a;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: left;
+        }
+
+        .dc-box-title {
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 12px;
+            color: #1a1a1a;
+        }
+
+        .dc-bh-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            font-size: 12px;
+        }
+
+        .day-context-btn {
+            background-color: #ffebf8 !important;
+            border: 1px solid #FD3DB5 !important;
+            color: #c21482 !important;
+            font-weight: 600;
+        }
+
+        .day-context-btn:hover {
+            background-color: #fcdbf0 !important;
+            border-color: #e62aa2 !important;
+        }
+
+        .week-band-label {
+            position: relative;
+            z-index: 1;
+            background: #ffffff;
+            padding: 0 10px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #888;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.1s ease;
+        }
+
+        .week-band-label:hover {
+            color: #1a1a1a;
+            transform: scale(1.1);
+        }
+
+        .off-routine-cross {
+            color: #d32f2f;
+            font-size: 12px;
+            font-family: var(--sans);
+            font-weight: 700;
+            display: block;
+            line-height: 8px;
+            margin-top: 3px;
+        }
+
+        @media (max-width: 650px) {
+            .day-context-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (min-width: 769px) {
+            #mobileEditBtn {
+                display: none !important;
+            }
+        }
+
         @media (max-width: 768px) {
             body {
                 overflow: auto !important;
@@ -1031,15 +1126,42 @@
             }
 
             .modal-content {
-                padding: 24px 16px;
-                margin: 0 16px;
-                width: 100%;
+                padding: 20px 16px !important;
+                margin: 0 auto !important;
+                width: 92% !important;
+                max-height: 85vh !important;
+                overflow-y: auto !important;
                 box-sizing: border-box;
             }
 
+            .day-context-grid {
+                gap: 12px !important;
+                margin-bottom: 16px !important;
+            }
+
+            .dc-box {
+                padding: 14px !important;
+            }
+
+            .dc-box-title {
+                font-size: 15px !important;
+                margin-bottom: 8px !important;
+            }
+
+            .dc-box textarea {
+                min-height: 70px !important;
+            }
+
             .modal-buttons {
-                flex-direction: column;
-                gap: 8px;
+                flex-direction: column !important;
+                gap: 8px !important;
+                margin-top: 10px !important;
+            }
+
+            .modal-buttons .modal-btn {
+                flex: none !important;
+                width: 100% !important;
+                margin: 0 !important;
             }
 
             .modal-btn {
@@ -1626,6 +1748,55 @@
 
     <script>
 
+        let dcIntentHorizon = "{{ ctx.intent_horizon|default('survival', true) }}";
+        let dcResilStatus = "{{ ctx.resil_status|default('baseline', true) }}";
+        let dcOffRoutine = false;
+
+        function dcSetOffRoutine(isOff) {
+            dcOffRoutine = isOff;
+            renderDcColors();
+        }
+
+        function renderDcColors() {
+            const routineContainer = document.getElementById('dcRoutineColors');
+            if (routineContainer) {
+                const statuses = [
+                    { isOff: true, color: '#ffebee', border: '#d32f2f', label: 'Off' },
+                    { isOff: false, color: '#e8f5e9', border: '#2e7d32', label: 'On' }
+                ];
+                routineContainer.innerHTML = statuses.map(s => {
+                    const isActive = dcOffRoutine === s.isOff;
+                    const style = `background: ${s.color}; border: ${isActive ? '1.5px solid #1a1a1a' : '1px solid ' + s.border}; 
+                           width: 24px; height: 24px; cursor: pointer; border-radius: 4px; transition: transform 0.1s;
+                           ${isActive ? 'transform: scale(1.15);' : 'opacity: 0.5;'}`;
+                    return `<button type="button" onclick="dcSetOffRoutine(${s.isOff})" style="${style}" title="${s.label} Routine"></button>`;
+                }).join('');
+            }
+
+            const intentContainer = document.getElementById('dcIntentColors');
+            if (intentContainer) {
+                intentContainer.innerHTML = CAL_HORIZONS.slice(0, 4).map(h => {
+                    const isActive = dcIntentHorizon === h.id;
+                    const style = `background: ${h.color}; border: ${isActive ? '1.5px solid #1a1a1a' : '1px solid #ddd'}; 
+                           width: 20px; height: 20px; cursor: pointer; border-radius: 4px; ${isActive ? 'transform: scale(1.1);' : 'opacity: 0.6;'}`;
+                    return `<button type="button" class="cal-h-btn" style="${style}" onclick="dcSetIntent('${h.id}')"></button>`;
+                }).join('');
+            }
+
+            const resilContainer = document.getElementById('dcResilColors');
+            if (resilContainer) {
+                resilContainer.innerHTML = RESILIENCE_STATUSES.map(s => {
+                    const isActive = dcResilStatus === s.id;
+                    const style = `background: ${s.color}; border: ${isActive ? '1.5px solid #1a1a1a' : '1px solid #ddd'}; 
+                           width: 20px; height: 20px; cursor: pointer; border-radius: 4px; ${isActive ? 'transform: scale(1.1);' : 'opacity: 0.6;'}`;
+                    return `<button type="button" class="cal-h-btn" style="${style}" onclick="dcSetResil('${s.id}')"></button>`;
+                }).join('');
+            }
+        }
+
+        function dcSetIntent(id) { dcIntentHorizon = id; renderDcColors(); }
+        function dcSetResil(id) { dcResilStatus = id; renderDcColors(); }
+
         const IS_AUTH = ("{{ is_auth }}" === "True" || "{{ is_auth }}" === "true");
 
         function toggleMobileMenu() {
@@ -1884,12 +2055,9 @@
 
             localStorage.setItem('habitEditMode', isOn);
 
-            const btn = document.getElementById('editToggleBtn');
-            if (btn) {
+            document.querySelectorAll('.edit-toggle-btn').forEach(btn => {
                 btn.classList.toggle('on', isOn);
-                const label = btn.querySelector('.edit-label');
-                if (label) label.textContent = isOn ? 'Edit: ON' : 'Edit: OFF';
-            }
+            });
         }
 
         function logoutAuth() {
@@ -1959,14 +2127,72 @@
             showModalWindow('contextModal');
         }
 
+        let currentContextDate = '';
+
+        function openContextModalFromHeader() {
+            const chicagoTimeStr = new Date().toLocaleString("en-US", { timeZone: "America/Chicago" });
+            const today = new Date(chicagoTimeStr);
+            const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            openContextModalForDate(dateStr);
+        }
+
+        async function openContextModalForDate(dateStr) {
+            currentContextDate = dateStr;
+
+            try {
+                const resp = await fetch('/api/get_day_info', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ date: dateStr })
+                });
+                const data = await resp.json();
+
+                if (data.success) {
+                    dcOffRoutine = data.off;
+                    document.getElementById('ctxOffReason').value = data.off_reason;
+
+                    document.getElementById('bh_hydroxizine').checked = data.bh_hydroxizine;
+                    document.getElementById('bh_ritalin').checked = data.bh_ritalin;
+                    document.getElementById('bh_modafinil').checked = data.bh_modafinil;
+                    document.getElementById('bh_caffeine').checked = data.bh_caffeine;
+                    document.getElementById('bh_alcohol').checked = data.bh_alcohol;
+                    document.getElementById('bh_thc').checked = data.bh_thc;
+
+                    dcIntentHorizon = data.intent_horizon || 'survival';
+                    document.getElementById('dcIntentHeader').value = data.intent_header;
+                    document.getElementById('dcIntentNotes').value = data.intent_notes;
+
+                    dcResilStatus = data.resil_status || 'baseline';
+                    document.getElementById('dcResilHeader').value = data.resil_header;
+                    document.getElementById('dcResilNotes').value = data.resil_notes;
+
+                    renderDcColors();
+
+                    document.querySelector('#contextModal .modal-title').innerText = `Day Context: ${dateStr}`;
+
+                    showModalWindow('contextModal');
+                }
+            } catch (e) {
+                console.error("Error loading day context", e);
+            }
+        }
+
         function saveContext() {
             const payload = {
-                top_work: document.getElementById('ctxWork').value,
-                top_other: document.getElementById('ctxOther').value,
-                project: document.getElementById('ctxProject').value,
-                meds: document.getElementById('ctxMeds').checked,
-                off_routine: document.getElementById('ctxOff').checked,
-                off_reason: document.getElementById('ctxOffReason').value
+                date: currentContextDate,
+                off_routine: dcOffRoutine,
+                off_reason: document.getElementById('ctxOffReason').value,
+                bh_hydroxizine: document.getElementById('bh_hydroxizine').checked,
+                bh_ritalin: document.getElementById('bh_ritalin').checked,
+                bh_modafinil: document.getElementById('bh_modafinil').checked,
+                bh_caffeine: document.getElementById('bh_caffeine').checked,
+                bh_alcohol: document.getElementById('bh_alcohol').checked,
+                bh_thc: document.getElementById('bh_thc').checked,
+                intent_horizon: dcIntentHorizon,
+                intent_header: document.getElementById('dcIntentHeader').value,
+                intent_notes: document.getElementById('dcIntentNotes').value,
+                resil_status: dcResilStatus,
+                resil_header: document.getElementById('dcResilHeader').value,
+                resil_notes: document.getElementById('dcResilNotes').value
             };
 
             fetch('/api/update_day_context', {
@@ -2072,12 +2298,9 @@
 
             if (localStorage.getItem('habitEditMode') === 'true') {
                 document.body.classList.add('edit-mode');
-                const btn = document.getElementById('editToggleBtn');
-                if (btn) {
+                document.querySelectorAll('.edit-toggle-btn').forEach(btn => {
                     btn.classList.add('on');
-                    const label = btn.querySelector('.edit-label');
-                    if (label) label.textContent = 'Edit: ON';
-                }
+                });
             }
 
             const savedSortMode = localStorage.getItem('habitSortMode');
@@ -2129,6 +2352,42 @@
                 }
             });
         }
+
+        let currentWeekId = '';
+
+        async function openWeekContextModal(weekId) {
+            currentWeekId = weekId;
+
+            try {
+                const resp = await fetch('/api/get_week_info', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ week_id: weekId })
+                });
+                const data = await resp.json();
+
+                if (data.success) {
+                    document.getElementById('wcHeader').value = data.header || '';
+                    document.getElementById('wcNotes').value = data.notes || '';
+                    document.getElementById('weekModalTitle').innerText = `Week Context: ${weekId}`;
+
+                    showModalWindow('weekContextModal');
+                }
+            } catch (e) {
+                console.error("Error loading week context", e);
+            }
+        }
+
+        function saveWeekContext() {
+            const payload = {
+                week_id: currentWeekId,
+                header: document.getElementById('wcHeader').value,
+                notes: document.getElementById('wcNotes').value
+            };
+
+            fetch('/api/update_week_context', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+            }).then(() => location.reload());
+        }
     </script>
 </head>
 
@@ -2147,7 +2406,7 @@
                 <div class="toggle-group">
                     <button class="tgl-btn sort-tgl" data-mode="aggregate"
                         onclick="setSortMode('aggregate')">Helicopter</button>
-                    <button class="tgl-btn sort-tgl active" data-mode="type" 
+                    <button class="tgl-btn sort-tgl active" data-mode="type"
                         onclick="setSortMode('type')">Tracker</button>
                     <button class="tgl-btn sort-tgl" data-mode="calendar"
                         onclick="setSortMode('calendar')">Calendar</button>
@@ -2157,13 +2416,11 @@
                 <button class="control-btn mobile-menu-btn" onclick="toggleMobileMenu()">⋮</button>
 
                 <div class="action-buttons" id="actionButtons">
-                    <div class="edit-toggle" id="editToggleBtn" onclick="toggleEditMode()">
-                        <span class="edit-dot"></span>
-                        <span class="edit-label">Edit: OFF</span>
-                    </div>
+                    <button class="control-btn edit-toggle-btn" id="mobileEditBtn"
+                        onclick="toggleEditMode(); hideMobileMenu();">✏️ Edit</button>
 
-                    <button class="control-btn" onclick="openContextModalFromHeader(); hideMobileMenu();">Day
-                        Context</button>
+                    <button class="control-btn day-context-btn"
+                        onclick="openContextModalFromHeader(); hideMobileMenu();">Day Context</button>
                     <button class="control-btn" onclick="logoutAuth()">Lock</button>
                 </div>
                 {% else %}
@@ -2187,6 +2444,14 @@
                         style="grid-template-columns: max-content repeat({{ total_weeks }}, 14px 14px 14px 14px 14px 14px 14px 3px);">
                         {% if week_headers %}
                         <div class="grid-corner-nav">
+                            {% if is_auth %}
+                            <button type="button" class="grid-nav-btn edit-toggle-btn" onclick="toggleEditMode()"
+                                title="Toggle Edit Mode" style="margin-right: 8px; font-size: 12px;">✏️</button>
+                            <button type="button" class="grid-nav-btn"
+                                onclick="openWeekContextModal('{{ current_week_id }}')" title="Week Context"
+                                style="margin-right: 8px; font-size: 13px;">🗓️</button>
+                            {% endif %}
+
                             <button type="button" class="grid-nav-btn"
                                 onclick="navigateWeeks({{ current_offset - 6 }})">←</button>
 
@@ -2240,7 +2505,10 @@
                         {% endif %}
 
                         <div class="week-band" style="grid-column: {{ start_col }} / span 7;">
-                            <span class="week-band-label">{{ header }}</span>
+                            <span class="week-band-label" onclick="openWeekContextModal('{{ header.id }}')"
+                                title="Open context for {{ header.id }}">
+                                {{ header.label }}
+                            </span>
                             <span class="week-band-line"></span>
                         </div>
                         {% endfor %}
@@ -2251,8 +2519,16 @@
                         {% for day in week %}
                         {% set d_idx = loop.index0 %}
                         {% set col = 2 + (w_idx * 8) + d_idx %}
-                        <div class="day-date" style="grid-column: {{ col }};">{{ day.date.split('-')[-1] }}</div>
-                        <div class="day-letter" style="grid-column: {{ col }};">{{ days_letters[d_idx] }}</div>
+                        <div class="day-date" style="grid-column: {{ col }};"
+                            onclick="openContextModalForDate('{{ day.date }}')">{{ day.date.split('-')[-1] }}</div>
+
+                        <div class="day-letter" style="grid-column: {{ col }};">
+                            {{ days_letters[d_idx] }}
+                            {% if day.is_off_routine %}
+                            <span class="off-routine-cross">×</span>
+                            {% endif %}
+                        </div>
+
                         {% endfor %}
                         {% endfor %}
                         {% endif %}
@@ -2295,9 +2571,9 @@
                         <div class="habit-cell {% if day.status == 'hit' %}completed{% endif %} {% if day.is_today %}is-today{% endif %} {% if not is_last_week %}past-week{% endif %}"
                             style="grid-column: {{ current_col }};" data-id="{{ item.info.thread_id }}"
                             data-date="{{ day.date }}" data-rank="{{ item.info.rank }}" data-status="{{ day.status }}"
-                            data-week="{{ w_idx }}" data-idx="{{ ns_sort.idx }}" data-cat="{{ cat }}"
-                            {% if day.miss_reason %}data-reason="{{ day.miss_reason }}" {%
-                            endif %} onclick="handleCellClick(this)" oncontextmenu="handleRightClick(event, this)">
+                            data-week="{{ w_idx }}" data-idx="{{ ns_sort.idx }}" data-cat="{{ cat }}" {% if
+                            day.miss_reason %}data-reason="{{ day.miss_reason }}" {% endif %}
+                            onclick="handleCellClick(this)" oncontextmenu="handleRightClick(event, this)">
                         </div>
                         {% endfor %}
                         {% endfor %}
@@ -2313,7 +2589,9 @@
                         {% if week_headers %}
                         {% set last_header = week_headers[-1] %}
                         <div class="week-band" style="grid-column: 2 / span 7;">
-                            <span class="week-band-label">{{ last_header }}</span>
+                            <span class="week-band-label" onclick="openWeekContextModal('{{ last_header.id }}')">
+                                {{ last_header.label }}
+                            </span>
                             <span class="week-band-line"></span>
                         </div>
 
@@ -2321,9 +2599,18 @@
                         {% set last_week_days = grouped_threads[categories[0]][0].weeks[-1] %}
                         {% for day in last_week_days %}
                         {% set col = 2 + loop.index0 %}
-                        <div class="day-date" style="grid-column: {{ col }};">{{ day.date.split('-')[-1] }}</div>
-                        <div class="day-letter" style="grid-column: {{ col }};">{{ days_letters[loop.index0] }}</div>
+                        <div class="day-date" style="grid-column: {{ col }};"
+                            onclick="openContextModalForDate('{{ day.date }}')">{{ day.date.split('-')[-1] }}</div>
+
+                        <div class="day-letter" style="grid-column: {{ col }};">
+                            {{ days_letters[loop.index0] }}
+                            {% if day.is_off_routine %}
+                            <span class="off-routine-cross">×</span>
+                            {% endif %}
+                        </div>
+
                         {% endfor %}
+
                         {% endif %}
 
                         {% set ns_sort = namespace(idx=0) %}
@@ -2358,9 +2645,9 @@
                         <div class="habit-cell {% if day.status == 'hit' %}completed{% endif %} {% if day.is_today %}is-today{% endif %}"
                             style="grid-column: {{ current_col }};" data-id="{{ item.info.thread_id }}"
                             data-date="{{ day.date }}" data-rank="{{ item.info.rank }}" data-status="{{ day.status }}"
-                            data-week="{{ item.weeks|length - 1 }}" data-idx="{{ ns_sort.idx }}" data-cat="{{ cat }}"
-                            {% if day.miss_reason %}data-reason="{{ day.miss_reason }}" {%
-                            endif %} onclick="handleCellClick(this)" oncontextmenu="handleRightClick(event, this)">
+                            data-week="{{ item.weeks|length - 1 }}" data-idx="{{ ns_sort.idx }}" data-cat="{{ cat }}" {%
+                            if day.miss_reason %}data-reason="{{ day.miss_reason }}" {% endif %}
+                            onclick="handleCellClick(this)" oncontextmenu="handleRightClick(event, this)">
                         </div>
                         {% endfor %}
                         {% endfor %}
@@ -2880,46 +3167,92 @@
     </div>
 
     <div class="modal" id="contextModal">
-        <div class="modal-content">
-            <div class="modal-title" id="contextTitle">Day Context</div>
-            <div style="text-align: left; margin-bottom: 20px;">
+        <div class="modal-content"
+            style="max-width: 700px; width: 95%; border: 2px solid #1a1a1a; border-radius: 15px;">
+            <div class="modal-title" style="text-align:left; margin-bottom: 20px; font-weight: 700;">Day Context</div>
 
-                <label class="m-label">Work Priority</label><input type="text" id="ctxWork" value="{{ ctx.top_work }}"
-                    class="m-input">
-                <label class="m-label">Self Priority</label><input type="text" id="ctxOther" value="{{ ctx.top_other }}"
-                    class="m-input">
-                <label class="m-label">Project</label><input type="text" id="ctxProject" value="{{ ctx.project }}"
-                    class="m-input">
-                <label class="m-label">Twits (Day Log)</label>
-                <textarea id="ctxComments" class="m-input" readonly
-                    style="background: #f5f5f5; min-height: 60px; font-family: monospace; font-size: 11px; resize: vertical;"
-                    placeholder="Empty..."></textarea>
-                <div style="margin-top: 15px;">
-                    <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:500;">
-                        <input type="checkbox" id="ctxMeds" {% if ctx.meds %}checked{% endif %}> Meds Taken
-                    </label>
-                </div>
+            <div class="day-context-grid">
 
-                <div
-                    style="margin-top: 15px; padding: 12px; background: #fff5f5; border: 1px solid #ffebee; border-radius: 6px;">
-                    <label
-                        style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color: #d32f2f;">
-                        <input type="checkbox" id="ctxOff"
-                            onchange="document.getElementById('ctxOffReason').style.display = this.checked ? 'block' : 'none';"
-                            {% if ctx.off_routine %}checked{% endif %}> OFF ROUTINE
-                    </label>
+                <div class="dc-box">
+                    <div class="dc-box-title">Routine Status</div>
+                    <div id="dcRoutineColors" style="display: flex; gap: 12px; margin-bottom: 12px;">
+                    </div>
+
+                    <div class="m-label" style="margin-bottom: 4px;">Reason / Note</div>
                     <input type="text" id="ctxOffReason" value="{{ ctx.off_reason }}" class="m-input"
-                        style="display:{% if ctx.off_routine %}block{% else %}none{% endif %}; margin-top:8px; margin-bottom:0;"
-                        placeholder="Reason (Sick/Holiday)...">
+                        style="border: 1.5px solid #1a1a1a; border-radius: 8px; margin-bottom: 0;"
+                        placeholder="Notes...">
                 </div>
+
+                <div class="dc-box">
+                    <div class="dc-box-title">Biohacking</div>
+                    <div class="dc-bh-grid">
+                        <label><input type="checkbox" id="bh_hydroxizine" {% if ctx.bh_hydroxizine %}checked{% endif %}>
+                            Hydroxizine LN</label>
+                        <label><input type="checkbox" id="bh_ritalin" {% if ctx.bh_ritalin %}checked{% endif %}>
+                            Ritalin</label>
+                        <label><input type="checkbox" id="bh_modafinil" {% if ctx.bh_modafinil %}checked{% endif %}>
+                            Modafinil</label>
+                        <label><input type="checkbox" id="bh_caffeine" {% if ctx.bh_caffeine %}checked{% endif %}>
+                            Caffeine</label>
+                        <label><input type="checkbox" id="bh_alcohol" {% if ctx.bh_alcohol %}checked{% endif %}>
+                            Alcohol</label>
+                        <label><input type="checkbox" id="bh_thc" {% if ctx.bh_thc %}checked{% endif %}> THC</label>
+                    </div>
+                </div>
+
+                <div class="dc-box">
+                    <div class="dc-box-title">Intentionality</div>
+                    <div class="cal-horizon-selector" id="dcIntentColors" style="margin-bottom: 12px;"></div>
+                    <input type="text" id="dcIntentHeader" class="m-input" placeholder="Header (Briefly)..."
+                        value="{{ ctx.intent_header }}"
+                        style="border: 1.5px solid #1a1a1a; border-radius: 10px; margin-bottom: 8px;">
+                    <textarea id="dcIntentNotes" class="m-input" placeholder="Detailed notes..."
+                        style="min-height: 100px; border: 1.5px solid #1a1a1a; border-radius: 15px;">{{ ctx.intent_notes }}</textarea>
+                </div>
+
+                <div class="dc-box">
+                    <div class="dc-box-title">Resilience</div>
+                    <div class="cal-horizon-selector" id="dcResilColors" style="margin-bottom: 12px;"></div>
+                    <input type="text" id="dcResilHeader" class="m-input" placeholder="Header (Briefly)..."
+                        value="{{ ctx.resil_header }}"
+                        style="border: 1.5px solid #1a1a1a; border-radius: 10px; margin-bottom: 8px;">
+                    <textarea id="dcResilNotes" class="m-input" placeholder="Detailed notes..."
+                        style="min-height: 100px; border: 1.5px solid #1a1a1a; border-radius: 15px;">{{ ctx.resil_notes }}</textarea>
+                </div>
+
             </div>
-            <div class="modal-buttons">
-                <button class="modal-btn cancel" onclick="hideModalWindow('contextModal')">Close</button>
-                <button class="modal-btn black" onclick="saveContext()">Save All</button>
+
+            <div class="modal-buttons" style="margin-top: 20px;">
+                <button class="modal-btn cancel" onclick="hideModalWindow('contextModal')"
+                    style="flex: 1;">Close</button>
+                <button class="modal-btn black" onclick="saveContext()" style="flex: 2;">Save Daily Context</button>
             </div>
         </div>
     </div>
 
+
+    <div class="modal" id="weekContextModal">
+        <div class="modal-content"
+            style="max-width: 600px; width: 95%; border: 2px solid #1a1a1a; border-radius: 15px;">
+            <div class="modal-title" id="weekModalTitle"
+                style="text-align:left; margin-bottom: 20px; font-weight: 700;">Week Context</div>
+
+            <div class="dc-box" style="margin-bottom: 20px;">
+                <div class="dc-box-title">Weekly Focus / Intentions</div>
+                <input type="text" id="wcHeader" class="m-input" placeholder="Main goal or focus for the week..."
+                    style="border: 1.5px solid #1a1a1a; border-radius: 10px; margin-bottom: 8px;">
+                <textarea id="wcNotes" class="m-input" placeholder="Detailed notes, review, or thoughts..."
+                    style="min-height: 150px; border: 1.5px solid #1a1a1a; border-radius: 15px;"></textarea>
+            </div>
+
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" onclick="hideModalWindow('weekContextModal')"
+                    style="flex: 1;">Close</button>
+                <button class="modal-btn black" onclick="saveWeekContext()" style="flex: 2;">Save Week Context</button>
+            </div>
+        </div>
+    </div>
 
     <div class="modal" id="squareNoteModal">
         <div class="modal-content" style="max-width: 600px; width: 100%;">
