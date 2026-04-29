@@ -331,6 +331,9 @@ def restore_from_json(json_content):
         db.session.query(BotUser).delete()         
         db.session.query(PartnerRequest).delete()  
 
+        valid_threads = {t['thread_id'] for t in data.get('threads', [])}
+        valid_chains = {c['chain_id'] for c in data.get('chains', []) if c['thread_id'] in valid_threads}
+
         for w in data.get('week_contexts', []):
             db.session.add(WeekContext(week_id=w['week_id'], header=w.get('header', ''), notes=w.get('notes', '')))
         
@@ -347,6 +350,9 @@ def restore_from_json(json_content):
             db.session.add(th)
             
         for c in data.get('chains', []):
+            if c['thread_id'] not in valid_threads:
+                continue
+                
             start_date = datetime.datetime.strptime(c['chain_start_date'], '%Y-%m-%d').date() if c.get('chain_start_date') else None
             end_date = datetime.datetime.strptime(c['chain_end_date'], '%Y-%m-%d').date() if c.get('chain_end_date') else None
             chain = Chain(
@@ -357,10 +363,17 @@ def restore_from_json(json_content):
             db.session.add(chain)
 
         for s in data.get('squares', []):
+            if s['thread_id'] not in valid_threads:
+                continue
+                
+            chain_id = s.get('chain_id')
+            if chain_id not in valid_chains:
+                chain_id = None
+
             d_date = datetime.datetime.strptime(s['period'], '%Y-%m-%d').date()
             sq = Square(
                 square_id=s['square_id'], thread_id=s['thread_id'], period=d_date,
-                status=s['status'], chain_id=s.get('chain_id'), 
+                status=s['status'], chain_id=chain_id, 
                 chain_start=s.get('chain_start', False),
                 chain_end=s.get('chain_end', False), 
                 chain_end_reason=s.get('chain_end_reason', "")
@@ -433,8 +446,7 @@ def restore_from_json(json_content):
         return True, "Success."
     except Exception as e:
         db.session.rollback()
-        return False, str(e)    
-
+        return False, str(e)
 def send_scheduled_backup():
     try:
         with app.app_context():
