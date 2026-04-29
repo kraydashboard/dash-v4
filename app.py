@@ -1325,8 +1325,8 @@ with app.app_context():
             id="auto_backup",
             func=send_scheduled_backup,
             trigger="cron",
-            hour=23,
-            minute=59,
+            hour="0,6,12,18",
+            minute=0,
         )
 
 
