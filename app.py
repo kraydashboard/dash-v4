@@ -348,6 +348,8 @@ def restore_from_json(json_content):
                 cadence=t.get('cadence'), thread_name_redacted=t.get('thread_name_redacted'),
             )
             db.session.add(th)
+
+        db.session.flush()
             
         for c in data.get('chains', []):
             if c['thread_id'] not in valid_threads:
@@ -361,6 +363,8 @@ def restore_from_json(json_content):
                 duration=c['duration'], end_reason=c.get('end_reason', "")
             )
             db.session.add(chain)
+
+        db.session.flush()
 
         for s in data.get('squares', []):
             if s['thread_id'] not in valid_threads:
