@@ -655,16 +655,31 @@ def send_scheduled_backup():
 
             backup_content = create_full_backup_json()
             timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
-            filename = f"backup_{timestamp}.json"
+            json_filename = f"backup_{timestamp}.json"
+
+            db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
+            db_path = None
+            if db_uri.startswith("sqlite:///"):
+                db_path = db_uri.replace("sqlite:///", "")
 
             for admin in admins:
                 if request_bot:
                     request_bot.send_document(
                         admin.chat_id,
                         backup_content.encode("utf-8"),
-                        visible_file_name=filename,
+                        visible_file_name=json_filename,
                         caption=f"📦 Full Backup (JSON)",
                     )
+                    
+                    if db_path and os.path.exists(db_path):
+                        db_filename = f"Life_tracker_{timestamp}.db"
+                        with open(db_path, "rb") as f:
+                            request_bot.send_document(
+                                admin.chat_id,
+                                f,
+                                visible_file_name=db_filename,
+                                caption=f"🗄 Full Backup (SQLite DB)"
+                            )
     except Exception as e:
         print(f"Backup failed: {e}")
 
