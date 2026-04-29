@@ -967,10 +967,24 @@ def run_request_bot_thread():
         except Exception as e:
             print(f"Request Bot crash: {e}")
 
-if not any(t.name == "RequestBotThread" for t in threading.enumerate()):
-    t2 = threading.Thread(target=run_request_bot_thread, name="RequestBotThread")
-    t2.daemon = True
-    t2.start()
+import socket
+
+def is_bot_running():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(("127.0.0.1", 45678))
+        s.listen(1)
+        global _bot_lock_socket
+        _bot_lock_socket = s
+        return False
+    except socket.error:
+        return True
+
+if not is_bot_running():
+    if not any(t.name == "RequestBotThread" for t in threading.enumerate()):
+        t2 = threading.Thread(target=run_request_bot_thread, name="RequestBotThread")
+        t2.daemon = True
+        t2.start()
 
 @app.route('/api/calendar/<cal_type>/<int:year>/<int:month>', methods=['GET'])
 @login_required
