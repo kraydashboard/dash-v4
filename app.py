@@ -718,6 +718,32 @@ if request_bot:
             else:
                 request_bot.reply_to(message, "bro, where is json")
 
+    @request_bot.message_handler(commands=["getdb"])
+    def handle_getdb(message):
+        with app.app_context():
+            user = db.session.get(BotUser, message.chat.id)
+            if user and user.role == "admin":
+                db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
+                
+                if db_uri.startswith("sqlite:////data/"):
+                    db_path = db_uri.replace("sqlite:///", "")
+                    
+                    if os.path.exists(db_path):
+                        request_bot.reply_to(message, "⏳ Завантажую файл бази...")
+                        with open(db_path, "rb") as f:
+                            request_bot.send_document(
+                                message.chat.id, 
+                                f, 
+                                visible_file_name="Life_tracker.db", 
+                                caption="📦 Оригінальний файл бази SQLite (з тому /data/)"
+                            )
+                    else:
+                        request_bot.reply_to(message, "❌ Файл бази даних не знайдено в /data/.")
+                else:
+                    request_bot.reply_to(message, "❌ Ця функція доступна ЛИШЕ коли база лежить у томі /data/ (на сервері).")
+            else:
+                request_bot.reply_to(message, "bro, who are you?")
+
     @request_bot.message_handler(content_types=["document"])
     def handle_docs(message):
         with app.app_context():
@@ -727,19 +753,40 @@ if request_bot:
 
         try:
             file_name = message.document.file_name
-            if not file_name.endswith(".json"):
-                request_bot.reply_to(message, "❌ I need .json file")
-                return
             file_info = request_bot.get_file(message.document.file_id)
             downloaded_file = request_bot.download_file(file_info.file_path)
-            json_content = downloaded_file.decode("utf-8")
-            request_bot.reply_to(message, "⏳ restoring...")
-            with app.app_context():
-                success, msg = restore_from_json(json_content)
-            if success:
-                request_bot.reply_to(message, "✅ Success.")
+
+            if file_name.endswith(".json"):
+                request_bot.reply_to(message, "⏳ restoring from json...")
+                json_content = downloaded_file.decode("utf-8")
+                with app.app_context():
+                    success, msg = restore_from_json(json_content)
+                if success:
+                    request_bot.reply_to(message, "✅ Success.")
+                else:
+                    request_bot.reply_to(message, f"❌ Error: {msg}")
+
+            elif file_name.endswith(".db"):
+                db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
+                
+                if db_uri.startswith("sqlite:////data/"):
+                    db_path = db_uri.replace("sqlite:///", "")
+                    
+                    request_bot.reply_to(message, "⏳ Замінюю файл бази даних у /data/...")
+                    
+                    with app.app_context():
+                        db.engine.dispose()
+                        
+                        with open(db_path, 'wb') as f:
+                            f.write(downloaded_file)
+                            
+                    request_bot.reply_to(message, "✅ Базу SQLite в /data/ успішно замінено! Все запрацює при наступному запиті.")
+                else:
+                    request_bot.reply_to(message, "❌ Заміна файлу .db дозволена ТІЛЬКИ якщо програма запущена на сервері з томом /data/.")
+            
             else:
-                request_bot.reply_to(message, f"❌ Error: {msg}")
+                request_bot.reply_to(message, "❌ Відправ мені .json або .db файл.")
+                
         except Exception as e:
             request_bot.reply_to(message, f"Error: {e}")
 
