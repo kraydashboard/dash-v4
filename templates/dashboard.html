@@ -200,7 +200,7 @@
                         {% set d_idx = loop.index0 %}
                         {% set current_col = 2 + (w_idx * 8) + d_idx %}
 
-                        <div class="habit-cell {% if day.status == 'hit' %}completed{% endif %} {% if day.is_today %}is-today{% endif %} {% if not is_last_week %}past-week{% endif %}"
+                        <div class="habit-cell {% if day.status == 'hit' %}completed{% endif %} {% if day.is_today %}is-today{% endif %} {% if not is_last_week %}past-week{% endif %} {% if day.is_padding %}padding{% endif %}"
                             style="grid-column: {{ current_col }};" data-id="{{ item.info.thread_id }}"
                             data-date="{{ day.date }}" data-rank="{{ item.info.rank }}" data-status="{{ day.status }}"
                             data-week="{{ w_idx }}" data-idx="{{ ns_sort.idx }}" data-cat="{{ cat }}" {% if
@@ -274,7 +274,7 @@
                         {% set last_week = item.weeks[-1] %}
                         {% for day in last_week %}
                         {% set current_col = 2 + loop.index0 %}
-                        <div class="habit-cell {% if day.status == 'hit' %}completed{% endif %} {% if day.is_today %}is-today{% endif %}"
+                        <div class="habit-cell {% if day.status == 'hit' %}completed{% endif %} {% if day.is_today %}is-today{% endif %} {% if not is_last_week %}past-week{% endif %} {% if day.is_padding %}padding{% endif %}"
                             style="grid-column: {{ current_col }};" data-id="{{ item.info.thread_id }}"
                             data-date="{{ day.date }}" data-rank="{{ item.info.rank }}" data-status="{{ day.status }}"
                             data-week="{{ item.weeks|length - 1 }}" data-idx="{{ ns_sort.idx }}" data-cat="{{ cat }}" {%
@@ -733,14 +733,20 @@
                     <option value="frog">Frog</option>
                 </select>
                 <label class="m-label">Frequency</label>
-                <select id="newThreadCadence" class="m-input">
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="3x_week">3x / Week</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="quarterly">Seasonally</option>
-                    <option value="yearly">Yearly</option>
+                <select id="newThreadCadenceMode" class="m-input" onchange="toggleCadenceMode('new')">
+                    <option value="daily">Every day</option>
+                    <option value="specific">Select Days</option>
                 </select>
+                <div id="newThreadDays"
+                    style="display: none; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; font-size: 13px;">
+                    <label><input type="checkbox" value="0"> Пн</label>
+                    <label><input type="checkbox" value="1"> Вт</label>
+                    <label><input type="checkbox" value="2"> Ср</label>
+                    <label><input type="checkbox" value="3"> Чт</label>
+                    <label><input type="checkbox" value="4"> Пт</label>
+                    <label><input type="checkbox" value="5"> Сб</label>
+                    <label><input type="checkbox" value="6"> Нд</label>
+                </div>
             </div>
             <div class="modal-buttons">
                 <button class="modal-btn cancel" onclick="hideModalWindow('addThreadModal')">Cancel</button>
@@ -771,14 +777,20 @@
                 </select>
 
                 <label class="m-label">Frequency</label>
-                <select id="editThreadCadence" class="m-input">
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="3x_week">3x / Week</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="quarterly">Seasonally</option>
-                    <option value="yearly">Yearly</option>
+                <select id="editThreadCadenceMode" class="m-input" onchange="toggleCadenceMode('edit')">
+                    <option value="daily">Щоденно</option>
+                    <option value="specific">Обрані дні</option>
                 </select>
+                <div id="editThreadDays"
+                    style="display: none; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; font-size: 13px;">
+                    <label><input type="checkbox" value="0"> Пн</label>
+                    <label><input type="checkbox" value="1"> Вт</label>
+                    <label><input type="checkbox" value="2"> Ср</label>
+                    <label><input type="checkbox" value="3"> Чт</label>
+                    <label><input type="checkbox" value="4"> Пт</label>
+                    <label><input type="checkbox" value="5"> Сб</label>
+                    <label><input type="checkbox" value="6"> Нд</label>
+                </div>
 
                 <label class="m-label">Time of Day</label>
                 <select id="editThreadTime" class="m-input">
