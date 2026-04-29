@@ -4,7 +4,7 @@ import requests
 import hashlib
 import threading
 import json
-import telebot 
+import telebot
 from datetime import date, timedelta
 from flask import Flask, render_template, request, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy
@@ -18,8 +18,12 @@ app = Flask(__name__)
 # --- CONFIG ---
 app.secret_key = os.environ.get("SECRET_KEY", "sdfeergrthbwefsDSlvsrgpsesvaflsvkvl")
 REQUEST_BOT_TOKEN = os.environ.get("REQUEST_BOT_TOKEN", "")
-HASH_USER = os.environ.get("HASH_USER", "a080f87fefbcc9ddfe34650dd5c20659b852fd8cdd8e269a2bc5c3f4ad7cd7cf")
-HASH_ADMIN = os.environ.get("HASH_ADMIN", "a5a915b49d0188897ddbdcaf47868a28af8d06851f3430bbe43e49660f05760a")
+HASH_USER = os.environ.get(
+    "HASH_USER", "a080f87fefbcc9ddfe34650dd5c20659b852fd8cdd8e269a2bc5c3f4ad7cd7cf"
+)
+HASH_ADMIN = os.environ.get(
+    "HASH_ADMIN", "a5a915b49d0188897ddbdcaf47868a28af8d06851f3430bbe43e49660f05760a"
+)
 HASH_WEB = os.environ.get("HASH_WEB", HASH_USER)
 database_url = os.environ.get("DATABASE_URL")
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -27,19 +31,27 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 if database_url:
     if database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql://", 1)
-    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 else:
-    db_filename = 'Life_tracker.db'
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, db_filename)
+    if os.path.isdir('/data'):
+        app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:////data/Life_tracker.db"
+    else:
+        db_filename = "Life_tracker.db"
+        app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(
+            basedir, db_filename
+        )
 
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    "pool_pre_ping": True, 
-    "pool_recycle": 280, 
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "pool_pre_ping": True,
+    "pool_recycle": 280,
 }
+
+
 class Config:
     SCHEDULER_API_ENABLED = True
+
 
 app.config.from_object(Config())
 
@@ -53,48 +65,53 @@ if REQUEST_BOT_TOKEN:
 
 # --- MODELS ---
 
+
 class BotUser(db.Model):
-    __tablename__ = 'bot_users'
+    __tablename__ = "bot_users"
     chat_id = db.Column(db.BigInteger, primary_key=True)
     role = db.Column(db.String(20), nullable=False)
 
+
 class Thread(db.Model):
-    __tablename__ = 'threads'
+    __tablename__ = "threads"
     thread_id = db.Column(db.Integer, primary_key=True)
     thread_name = db.Column(db.String(100), nullable=False)
-    category = db.Column(db.String(50)) 
-    status = db.Column(db.String(20), default='active')
+    category = db.Column(db.String(50))
+    status = db.Column(db.String(20), default="active")
     rank = db.Column(db.Integer, default=1)
     created_at = db.Column(db.Date, default=date.today)
     created_at_40k = db.Column(db.String(20))
     closed_date = db.Column(db.Date, nullable=True)
     thread_name_redacted = db.Column(db.String(100))
     sub_category = db.Column(db.String(50))
-    type = db.Column(db.String(20))     
+    type = db.Column(db.String(20))
     cadence = db.Column(db.String(50))
 
+
 class Chain(db.Model):
-    __tablename__ = 'chains'
+    __tablename__ = "chains"
     chain_id = db.Column(db.String(50), primary_key=True)
-    thread_id = db.Column(db.Integer, db.ForeignKey('threads.thread_id'))
+    thread_id = db.Column(db.Integer, db.ForeignKey("threads.thread_id"))
     chain_start_date = db.Column(db.Date)
     chain_end_date = db.Column(db.Date)
     duration = db.Column(db.Integer, default=0)
     end_reason = db.Column(db.String(255))
 
+
 class Square(db.Model):
-    __tablename__ = 'squares'
+    __tablename__ = "squares"
     square_id = db.Column(db.String(100), primary_key=True)
-    thread_id = db.Column(db.Integer, db.ForeignKey('threads.thread_id'))
-    period = db.Column(db.Date) 
-    status = db.Column(db.String(10), default='empty')
-    chain_id = db.Column(db.String(50), db.ForeignKey('chains.chain_id'), nullable=True)
+    thread_id = db.Column(db.Integer, db.ForeignKey("threads.thread_id"))
+    period = db.Column(db.Date)
+    status = db.Column(db.String(10), default="empty")
+    chain_id = db.Column(db.String(50), db.ForeignKey("chains.chain_id"), nullable=True)
     chain_start = db.Column(db.Boolean, default=False)
     chain_end = db.Column(db.Boolean, default=False)
-    chain_end_reason = db.Column(db.Text, default="") 
+    chain_end_reason = db.Column(db.Text, default="")
+
 
 class Calendar(db.Model):
-    __tablename__ = 'calendar'
+    __tablename__ = "calendar"
     actual_date = db.Column(db.Date, primary_key=True)
     date_40k = db.Column(db.String(20))
     week_40k = db.Column(db.String(20))
@@ -102,9 +119,9 @@ class Calendar(db.Model):
     top_other_priority = db.Column(db.String(200), default="")
     off_routine_flag = db.Column(db.Boolean, default=False)
     off_routine_reason = db.Column(db.String(200), default="")
-    project_type_this_week = db.Column(db.String(100), default="") 
-    day_meds = db.Column(db.Boolean, default=False) 
-    comments = db.Column(db.Text, default="") 
+    project_type_this_week = db.Column(db.String(100), default="")
+    day_meds = db.Column(db.Boolean, default=False)
+    comments = db.Column(db.Text, default="")
     bh_hydroxizine = db.Column(db.Boolean, default=False)
     bh_ritalin = db.Column(db.Boolean, default=False)
     bh_modafinil = db.Column(db.Boolean, default=False)
@@ -112,85 +129,119 @@ class Calendar(db.Model):
     bh_alcohol = db.Column(db.Boolean, default=False)
     bh_thc = db.Column(db.Boolean, default=False)
 
+
 class WeekContext(db.Model):
-    __tablename__ = 'week_contexts'
+    __tablename__ = "week_contexts"
     week_id = db.Column(db.String(20), primary_key=True)
     header = db.Column(db.Text, default="")
     notes = db.Column(db.Text, default="")
 
+
 class BoardItem(db.Model):
-    __tablename__ = 'board_items'
+    __tablename__ = "board_items"
     id = db.Column(db.Integer, primary_key=True)
     text = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.datetime.now(ZoneInfo("America/Chicago")))
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.datetime.now(ZoneInfo("America/Chicago"))
+    )
+
 
 class IntentEntry(db.Model):
-    __tablename__ = 'intent_entries'
+    __tablename__ = "intent_entries"
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, default=1) 
+    user_id = db.Column(db.Integer, default=1)
     entry_date = db.Column(db.Date, nullable=False)
     horizon = db.Column(db.String(20))
     content = db.Column(db.Text)
     notes = db.Column(db.Text, default="")
     plan = db.Column(db.Boolean, default=False)
 
+
 class ResilienceEntry(db.Model):
-    __tablename__ = 'resilience_entries'
+    __tablename__ = "resilience_entries"
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, default=1) 
+    user_id = db.Column(db.Integer, default=1)
     entry_date = db.Column(db.Date, nullable=False)
-    status = db.Column(db.String(20), default='baseline')
+    status = db.Column(db.String(20), default="baseline")
     content = db.Column(db.Text)
     notes = db.Column(db.Text, default="")
-    
+
+
 class PartnerRequest(db.Model):
-    __tablename__ = 'partner_requests'
+    __tablename__ = "partner_requests"
     id = db.Column(db.Integer, primary_key=True)
     text = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.datetime.now(ZoneInfo("America/Chicago")))
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.datetime.now(ZoneInfo("America/Chicago"))
+    )
+
 
 def get_week_data(d_obj):
     year, week, day = d_obj.isocalendar()
     return f"{year}-W{week}-{day}", f"Week {week}"
 
+
 def ensure_calendar_entry(d_date):
     entry = db.session.get(Calendar, d_date)
     if not entry:
         date_str, week_str = get_week_data(d_date)
-        entry = Calendar(
-            actual_date=d_date,
-            date_40k=date_str,
-            week_40k=week_str
-        )
+        entry = Calendar(actual_date=d_date, date_40k=date_str, week_40k=week_str)
         db.session.add(entry)
         db.session.commit()
     return entry
+
 
 def recalculate_chains(thread_id):
     try:
         Chain.query.filter_by(thread_id=thread_id).delete()
         thread = db.session.get(Thread, thread_id)
-        if not thread: return
-        
-        tolerance_days = 1 
-        if thread.cadence == 'weekly': tolerance_days = 7
-        elif thread.cadence == '3x_week': tolerance_days = 3
-        elif thread.cadence == 'monthly': tolerance_days = 31
-        elif thread.cadence == 'quarterly': tolerance_days = 92
-        elif thread.cadence == 'yearly': tolerance_days = 366
+        if not thread:
+            return
 
-        hits = Square.query.filter_by(thread_id=thread_id, status='hit').order_by(Square.period).all()
+        if not thread.cadence or thread.cadence == "daily":
+            tolerance_days = 1
+        else:
+            try:
+                scheduled = sorted(
+                    [int(x) for x in thread.cadence.split(",") if x.isdigit()]
+                )
+                if scheduled:
+                    gaps = []
+                    for i in range(len(scheduled)):
+                        next_idx = (i + 1) % len(scheduled)
+                        gap = scheduled[next_idx] - scheduled[i]
+                        if gap <= 0:
+                            gap += 7
+                        gaps.append(gap)
+                    tolerance_days = max(gaps) if gaps else 1
+                else:
+                    tolerance_days = 1
+            except:
+                tolerance_days = 1
+
+        hits = (
+            Square.query.filter_by(thread_id=thread_id, status="hit")
+            .order_by(Square.period)
+            .all()
+        )
         if not hits:
             db.session.commit()
             return
-        
+
         current_chain = None
         for i, sq in enumerate(hits):
             if current_chain is None:
                 new_chain_id = f"CH_{thread_id}_{sq.period.strftime('%Y%m%d')}"
-                current_chain = Chain(chain_id=new_chain_id, thread_id=thread_id, chain_start_date=sq.period, chain_end_date=sq.period, duration=1, end_reason="")
+                current_chain = Chain(
+                    chain_id=new_chain_id,
+                    thread_id=thread_id,
+                    chain_start_date=sq.period,
+                    chain_end_date=sq.period,
+                    duration=1,
+                    end_reason="",
+                )
                 db.session.add(current_chain)
-                sq.chain_id = new_chain_id 
+                sq.chain_id = new_chain_id
             else:
                 gap = (sq.period - current_chain.chain_end_date).days
                 if gap <= tolerance_days:
@@ -199,45 +250,60 @@ def recalculate_chains(thread_id):
                     sq.chain_id = current_chain.chain_id
                 else:
                     last_end = current_chain.chain_end_date
-                    miss_sq = Square.query.filter(Square.thread_id==thread_id, Square.status=='miss', Square.period > last_end, Square.period < sq.period).first()
-                    current_chain.end_reason = miss_sq.chain_end_reason if miss_sq else "gap"
+                    miss_sq = Square.query.filter(
+                        Square.thread_id == thread_id,
+                        Square.status == "miss",
+                        Square.period > last_end,
+                        Square.period < sq.period,
+                    ).first()
+                    current_chain.end_reason = (
+                        miss_sq.chain_end_reason if miss_sq else "gap"
+                    )
                     new_chain_id = f"CH_{thread_id}_{sq.period.strftime('%Y%m%d')}"
-                    current_chain = Chain(chain_id=new_chain_id, thread_id=thread_id, chain_start_date=sq.period, chain_end_date=sq.period, duration=1, end_reason="")
+                    current_chain = Chain(
+                        chain_id=new_chain_id,
+                        thread_id=thread_id,
+                        chain_start_date=sq.period,
+                        chain_end_date=sq.period,
+                        duration=1,
+                        end_reason="",
+                    )
                     db.session.add(current_chain)
                     sq.chain_id = new_chain_id
         db.session.commit()
     except Exception as e:
         print(f"Chain error: {e}")
 
+
 def is_day_fulfilled(thread, date_obj, squares_map):
-    if not thread.cadence or thread.cadence == 'daily': 
+    if not thread.cadence or thread.cadence == "daily":
         return False
-        
+
     target_hits = 1
     start_date = None
     end_date = None
-    
-    if thread.cadence in ['3x_week', 'weekly']:
+
+    if thread.cadence in ["3x_week", "weekly"]:
         start_date = date_obj - timedelta(days=date_obj.weekday())
         end_date = start_date + timedelta(days=6)
-        if thread.cadence == '3x_week': 
+        if thread.cadence == "3x_week":
             target_hits = 3
-    elif thread.cadence == 'monthly':
+    elif thread.cadence == "monthly":
         start_date = date_obj.replace(day=1)
         next_month = (start_date + timedelta(days=32)).replace(day=1)
         end_date = next_month - timedelta(days=1)
-    elif thread.cadence == 'quarterly':
+    elif thread.cadence == "quarterly":
         quarter = (date_obj.month - 1) // 3 + 1
         start_month = (quarter - 1) * 3 + 1
         start_date = date(date_obj.year, start_month, 1)
-        if start_month + 3 > 12: 
+        if start_month + 3 > 12:
             end_date = date(date_obj.year, 12, 31)
-        else: 
+        else:
             end_date = date(date_obj.year, start_month + 3, 1) - timedelta(days=1)
-    elif thread.cadence == 'yearly':
+    elif thread.cadence == "yearly":
         start_date = date(date_obj.year, 1, 1)
         end_date = date(date_obj.year, 12, 31)
-    else: 
+    else:
         return False
 
     hits_count = 0
@@ -245,81 +311,144 @@ def is_day_fulfilled(thread, date_obj, squares_map):
     for i in range(delta + 1):
         check_date = start_date + timedelta(days=i)
         sq = squares_map.get((thread.thread_id, check_date))
-        if sq and sq.status == 'hit': 
+        if sq and sq.status == "hit":
             hits_count += 1
-    
+
     current_sq = squares_map.get((thread.thread_id, date_obj))
-    is_currently_hit = (current_sq and current_sq.status == 'hit')
-    
-    if hits_count >= target_hits and not is_currently_hit: 
+    is_currently_hit = current_sq and current_sq.status == "hit"
+
+    if hits_count >= target_hits and not is_currently_hit:
         return True
-        
+
     return False
-        
+
+
 def create_full_backup_json():
     data = {}
-    data['week_contexts'] = [{
-        'week_id': w.week_id, 'header': w.header, 'notes': w.notes
-    } for w in WeekContext.query.all()]
-    data['threads'] = [{
-        'thread_id': t.thread_id, 'thread_name': t.thread_name, 'category': t.category,
-        'status': t.status, 'rank': t.rank, 
-        'created_at': t.created_at.strftime('%Y-%m-%d') if t.created_at else None,
-        'created_at_40k': t.created_at_40k, 'closed_date': t.closed_date.strftime('%Y-%m-%d') if t.closed_date else None,
-        'sub_category': t.sub_category, 'type': t.type, 'cadence': t.cadence,
-        'thread_name_redacted': t.thread_name_redacted,
-    } for t in Thread.query.all()]
-    
-    data['squares'] = [{
-        'square_id': s.square_id, 'thread_id': s.thread_id, 'period': str(s.period), 
-        'status': s.status, 'chain_id': s.chain_id, 'chain_start': s.chain_start,
-        'chain_end': s.chain_end, 'chain_end_reason': s.chain_end_reason
-    } for s in Square.query.filter(Square.status != 'empty').all()]
-    
-    data['calendar'] = [{
-        'actual_date': str(c.actual_date), 'date_40k': c.date_40k, 'week_40k': c.week_40k,
-        'top_work_priority': c.top_work_priority, 'top_other_priority': c.top_other_priority,
-        'off_routine_flag': c.off_routine_flag, 'off_routine_reason': c.off_routine_reason,
-        'project_type_this_week': c.project_type_this_week, 'day_meds': c.day_meds,
-        'comments': c.comments
-    } for c in Calendar.query.all()]
-    
-    data['board'] = [{
-        'id': b.id, 'text': b.text, 
-        'created_at': b.created_at.isoformat() if b.created_at else None
-    } for b in BoardItem.query.all()]
-    
-    data['chains'] = [{
-        'chain_id': c.chain_id, 'thread_id': c.thread_id,
-        'chain_start_date': c.chain_start_date.strftime('%Y-%m-%d') if c.chain_start_date else None, 
-        'chain_end_date': c.chain_end_date.strftime('%Y-%m-%d') if c.chain_end_date else None,
-        'duration': c.duration, 'end_reason': c.end_reason
-    } for c in Chain.query.all()]
-    
-    data['intent_entries'] = [{
-        'id': e.id, 'user_id': e.user_id, 'entry_date': str(e.entry_date),
-        'horizon': e.horizon, 'content': e.content, 'notes': e.notes, 'plan': e.plan
-    } for e in IntentEntry.query.all()]
-    
-    data['resilience_entries'] = [{
-        'id': e.id, 'user_id': e.user_id, 'entry_date': str(e.entry_date),
-        'status': e.status, 'content': e.content, 'notes': e.notes
-    } for e in ResilienceEntry.query.all()]
+    data["week_contexts"] = [
+        {"week_id": w.week_id, "header": w.header, "notes": w.notes}
+        for w in WeekContext.query.all()
+    ]
+    data["threads"] = [
+        {
+            "thread_id": t.thread_id,
+            "thread_name": t.thread_name,
+            "category": t.category,
+            "status": t.status,
+            "rank": t.rank,
+            "created_at": t.created_at.strftime("%Y-%m-%d") if t.created_at else None,
+            "created_at_40k": t.created_at_40k,
+            "closed_date": (
+                t.closed_date.strftime("%Y-%m-%d") if t.closed_date else None
+            ),
+            "sub_category": t.sub_category,
+            "type": t.type,
+            "cadence": t.cadence,
+            "thread_name_redacted": t.thread_name_redacted,
+        }
+        for t in Thread.query.all()
+    ]
 
-    data['bot_users'] = [{
-        'chat_id': u.chat_id, 'role': u.role
-    } for u in BotUser.query.all()]
-    
-    data['partner_requests'] = [{
-        'id': r.id, 'text': r.text, 
-        'created_at': r.created_at.isoformat() if r.created_at else None
-    } for r in PartnerRequest.query.all()]
+    data["squares"] = [
+        {
+            "square_id": s.square_id,
+            "thread_id": s.thread_id,
+            "period": str(s.period),
+            "status": s.status,
+            "chain_id": s.chain_id,
+            "chain_start": s.chain_start,
+            "chain_end": s.chain_end,
+            "chain_end_reason": s.chain_end_reason,
+        }
+        for s in Square.query.filter(Square.status != "empty").all()
+    ]
 
-    return json.dumps(data, indent=2, ensure_ascii=False)   
+    data["calendar"] = [
+        {
+            "actual_date": str(c.actual_date),
+            "date_40k": c.date_40k,
+            "week_40k": c.week_40k,
+            "top_work_priority": c.top_work_priority,
+            "top_other_priority": c.top_other_priority,
+            "off_routine_flag": c.off_routine_flag,
+            "off_routine_reason": c.off_routine_reason,
+            "project_type_this_week": c.project_type_this_week,
+            "day_meds": c.day_meds,
+            "comments": c.comments,
+        }
+        for c in Calendar.query.all()
+    ]
+
+    data["board"] = [
+        {
+            "id": b.id,
+            "text": b.text,
+            "created_at": b.created_at.isoformat() if b.created_at else None,
+        }
+        for b in BoardItem.query.all()
+    ]
+
+    data["chains"] = [
+        {
+            "chain_id": c.chain_id,
+            "thread_id": c.thread_id,
+            "chain_start_date": (
+                c.chain_start_date.strftime("%Y-%m-%d") if c.chain_start_date else None
+            ),
+            "chain_end_date": (
+                c.chain_end_date.strftime("%Y-%m-%d") if c.chain_end_date else None
+            ),
+            "duration": c.duration,
+            "end_reason": c.end_reason,
+        }
+        for c in Chain.query.all()
+    ]
+
+    data["intent_entries"] = [
+        {
+            "id": e.id,
+            "user_id": e.user_id,
+            "entry_date": str(e.entry_date),
+            "horizon": e.horizon,
+            "content": e.content,
+            "notes": e.notes,
+            "plan": e.plan,
+        }
+        for e in IntentEntry.query.all()
+    ]
+
+    data["resilience_entries"] = [
+        {
+            "id": e.id,
+            "user_id": e.user_id,
+            "entry_date": str(e.entry_date),
+            "status": e.status,
+            "content": e.content,
+            "notes": e.notes,
+        }
+        for e in ResilienceEntry.query.all()
+    ]
+
+    data["bot_users"] = [
+        {"chat_id": u.chat_id, "role": u.role} for u in BotUser.query.all()
+    ]
+
+    data["partner_requests"] = [
+        {
+            "id": r.id,
+            "text": r.text,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in PartnerRequest.query.all()
+    ]
+
+    return json.dumps(data, indent=2, ensure_ascii=False)
+
 
 def restore_from_json(json_content):
     try:
         data = json.loads(json_content)
+        # Очищення бази перед відновленням
         db.session.query(WeekContext).delete()
         db.session.query(Square).delete()
         db.session.query(Chain).delete()
@@ -327,112 +456,176 @@ def restore_from_json(json_content):
         db.session.query(Calendar).delete()
         db.session.query(Thread).delete()
         db.session.query(IntentEntry).delete()
-        db.session.query(ResilienceEntry).delete() 
-        db.session.query(BotUser).delete()         
-        db.session.query(PartnerRequest).delete()  
+        db.session.query(ResilienceEntry).delete()
+        db.session.query(BotUser).delete()
+        db.session.query(PartnerRequest).delete()
 
-        valid_threads = {t['thread_id'] for t in data.get('threads', [])}
-        valid_chains = {c['chain_id'] for c in data.get('chains', []) if c['thread_id'] in valid_threads}
+        # --- ФІЛЬТР ДЛЯ СИРІТ ---
+        # Збираємо всі існуючі ID звичок, щоб відсіяти старі непотрібні дані
+        valid_threads = {t["thread_id"] for t in data.get("threads", [])}
+        valid_chains = {
+            c["chain_id"]
+            for c in data.get("chains", [])
+            if c["thread_id"] in valid_threads
+        }
+        # ------------------------
 
-        for w in data.get('week_contexts', []):
-            db.session.add(WeekContext(week_id=w['week_id'], header=w.get('header', ''), notes=w.get('notes', '')))
-        
-        for t in data.get('threads', []):
-            dt = datetime.datetime.strptime(t['created_at'], '%Y-%m-%d').date() if t.get('created_at') else None
-            closed = datetime.datetime.strptime(t['closed_date'], '%Y-%m-%d').date() if t.get('closed_date') else None
+        for w in data.get("week_contexts", []):
+            db.session.add(
+                WeekContext(
+                    week_id=w["week_id"],
+                    header=w.get("header", ""),
+                    notes=w.get("notes", ""),
+                )
+            )
+
+        for t in data.get("threads", []):
+            dt = (
+                datetime.datetime.strptime(t["created_at"], "%Y-%m-%d").date()
+                if t.get("created_at")
+                else None
+            )
+            closed = (
+                datetime.datetime.strptime(t["closed_date"], "%Y-%m-%d").date()
+                if t.get("closed_date")
+                else None
+            )
             th = Thread(
-                thread_id=t['thread_id'], thread_name=t['thread_name'], category=t['category'],
-                status=t['status'], rank=t['rank'], created_at=dt, 
-                created_at_40k=t.get('created_at_40k'), closed_date=closed, 
-                sub_category=t.get('sub_category'), type=t.get('type'), 
-                cadence=t.get('cadence'), thread_name_redacted=t.get('thread_name_redacted'),
+                thread_id=t["thread_id"],
+                thread_name=t["thread_name"],
+                category=t["category"],
+                status=t["status"],
+                rank=t["rank"],
+                created_at=dt,
+                created_at_40k=t.get("created_at_40k"),
+                closed_date=closed,
+                sub_category=t.get("sub_category"),
+                type=t.get("type"),
+                cadence=t.get("cadence"),
+                thread_name_redacted=t.get("thread_name_redacted"),
             )
             db.session.add(th)
 
-        db.session.flush()
-            
-        for c in data.get('chains', []):
-            if c['thread_id'] not in valid_threads:
-                continue
-                
-            start_date = datetime.datetime.strptime(c['chain_start_date'], '%Y-%m-%d').date() if c.get('chain_start_date') else None
-            end_date = datetime.datetime.strptime(c['chain_end_date'], '%Y-%m-%d').date() if c.get('chain_end_date') else None
+        for c in data.get("chains", []):
+            if c["thread_id"] not in valid_threads:
+                continue  # Пропускаємо ланцюжки для давно видалених звичок
+
+            start_date = (
+                datetime.datetime.strptime(c["chain_start_date"], "%Y-%m-%d").date()
+                if c.get("chain_start_date")
+                else None
+            )
+            end_date = (
+                datetime.datetime.strptime(c["chain_end_date"], "%Y-%m-%d").date()
+                if c.get("chain_end_date")
+                else None
+            )
             chain = Chain(
-                chain_id=c['chain_id'], thread_id=c['thread_id'],
-                chain_start_date=start_date, chain_end_date=end_date,
-                duration=c['duration'], end_reason=c.get('end_reason', "")
+                chain_id=c["chain_id"],
+                thread_id=c["thread_id"],
+                chain_start_date=start_date,
+                chain_end_date=end_date,
+                duration=c["duration"],
+                end_reason=c.get("end_reason", ""),
             )
             db.session.add(chain)
 
-        db.session.flush()
+        for s in data.get("squares", []):
+            if s["thread_id"] not in valid_threads:
+                continue  # Пропускаємо квадратики для давно видалених звичок
 
-        for s in data.get('squares', []):
-            if s['thread_id'] not in valid_threads:
-                continue
-                
-            chain_id = s.get('chain_id')
+            chain_id = s.get("chain_id")
             if chain_id not in valid_chains:
-                chain_id = None
+                chain_id = (
+                    None  # Якщо ланцюжок відсутній, просто обнуляємо його зв'язок
+                )
 
-            d_date = datetime.datetime.strptime(s['period'], '%Y-%m-%d').date()
+            d_date = datetime.datetime.strptime(s["period"], "%Y-%m-%d").date()
             sq = Square(
-                square_id=s['square_id'], thread_id=s['thread_id'], period=d_date,
-                status=s['status'], chain_id=chain_id, 
-                chain_start=s.get('chain_start', False),
-                chain_end=s.get('chain_end', False), 
-                chain_end_reason=s.get('chain_end_reason', "")
+                square_id=s["square_id"],
+                thread_id=s["thread_id"],
+                period=d_date,
+                status=s["status"],
+                chain_id=chain_id,
+                chain_start=s.get("chain_start", False),
+                chain_end=s.get("chain_end", False),
+                chain_end_reason=s.get("chain_end_reason", ""),
             )
             db.session.add(sq)
-        
-        for e in data.get('intent_entries', []):
-            d_date = datetime.datetime.strptime(e['entry_date'], '%Y-%m-%d').date()
-            db.session.add(IntentEntry(
-                id=e.get('id'), user_id=e.get('user_id', 1), entry_date=d_date,
-                horizon=e.get('horizon'), content=e.get('content'),
-                notes=e.get('notes', ''), plan=e.get('plan') or False
-            ))
-            
-        for e in data.get('resilience_entries', []):
-            d_date = datetime.datetime.strptime(e['entry_date'], '%Y-%m-%d').date()
-            db.session.add(ResilienceEntry(
-                id=e.get('id'), user_id=e.get('user_id', 1), entry_date=d_date,
-                status=e.get('status', 'baseline'), content=e.get('content', ''),
-                notes=e.get('notes', '')
-            ))
 
-        for c in data.get('calendar', []):
-            d_date = datetime.datetime.strptime(c['actual_date'], '%Y-%m-%d').date()
+        for e in data.get("intent_entries", []):
+            d_date = datetime.datetime.strptime(e["entry_date"], "%Y-%m-%d").date()
+            db.session.add(
+                IntentEntry(
+                    id=e.get("id"),
+                    user_id=e.get("user_id", 1),
+                    entry_date=d_date,
+                    horizon=e.get("horizon"),
+                    content=e.get("content"),
+                    notes=e.get("notes", ""),
+                    plan=e.get("plan") or False,
+                )
+            )
+
+        for e in data.get("resilience_entries", []):
+            d_date = datetime.datetime.strptime(e["entry_date"], "%Y-%m-%d").date()
+            db.session.add(
+                ResilienceEntry(
+                    id=e.get("id"),
+                    user_id=e.get("user_id", 1),
+                    entry_date=d_date,
+                    status=e.get("status", "baseline"),
+                    content=e.get("content", ""),
+                    notes=e.get("notes", ""),
+                )
+            )
+
+        for c in data.get("calendar", []):
+            d_date = datetime.datetime.strptime(c["actual_date"], "%Y-%m-%d").date()
             cal = Calendar(
-                actual_date=d_date, date_40k=c.get('date_40k'), week_40k=c.get('week_40k'),
-                comments=c.get('comments'), top_work_priority=c.get('top_work_priority'),
-                top_other_priority=c.get('top_other_priority'), 
-                project_type_this_week=c.get('project_type_this_week'),
-                day_meds=c.get('day_meds', False), 
-                off_routine_flag=c.get('off_routine_flag', False),
-                off_routine_reason=c.get('off_routine_reason', "")
+                actual_date=d_date,
+                date_40k=c.get("date_40k"),
+                week_40k=c.get("week_40k"),
+                comments=c.get("comments"),
+                top_work_priority=c.get("top_work_priority"),
+                top_other_priority=c.get("top_other_priority"),
+                project_type_this_week=c.get("project_type_this_week"),
+                day_meds=c.get("day_meds", False),
+                off_routine_flag=c.get("off_routine_flag", False),
+                off_routine_reason=c.get("off_routine_reason", ""),
             )
             db.session.add(cal)
-            
-        for b in data.get('board', []):
-            c_at = datetime.datetime.fromisoformat(b['created_at']) if b.get('created_at') else datetime.datetime.now(ZoneInfo("America/Chicago"))
-            db.session.add(BoardItem(id=b.get('id'), text=b['text'], created_at=c_at))
-            
-        for u in data.get('bot_users', []):
-            db.session.add(BotUser(chat_id=u['chat_id'], role=u['role']))
-            
-        for r in data.get('partner_requests', []):
-            c_at = datetime.datetime.fromisoformat(r['created_at']) if r.get('created_at') else datetime.datetime.now(ZoneInfo("America/Chicago"))
-            db.session.add(PartnerRequest(id=r.get('id'), text=r['text'], created_at=c_at))
-            
+
+        for b in data.get("board", []):
+            c_at = (
+                datetime.datetime.fromisoformat(b["created_at"])
+                if b.get("created_at")
+                else datetime.datetime.now(ZoneInfo("America/Chicago"))
+            )
+            db.session.add(BoardItem(id=b.get("id"), text=b["text"], created_at=c_at))
+
+        for u in data.get("bot_users", []):
+            db.session.add(BotUser(chat_id=u["chat_id"], role=u["role"]))
+
+        for r in data.get("partner_requests", []):
+            c_at = (
+                datetime.datetime.fromisoformat(r["created_at"])
+                if r.get("created_at")
+                else datetime.datetime.now(ZoneInfo("America/Chicago"))
+            )
+            db.session.add(
+                PartnerRequest(id=r.get("id"), text=r["text"], created_at=c_at)
+            )
+
         db.session.commit()
-        
-        if db.engine.name == 'postgresql':
+
+        if db.engine.name == "postgresql":
             tables_to_sync = [
-                ('threads', 'thread_id'),
-                ('board_items', 'id'),
-                ('intent_entries', 'id'),
-                ('resilience_entries', 'id'),
-                ('partner_requests', 'id')
+                ("threads", "thread_id"),
+                ("board_items", "id"),
+                ("intent_entries", "id"),
+                ("resilience_entries", "id"),
+                ("partner_requests", "id"),
             ]
             for table, pk in tables_to_sync:
                 try:
@@ -442,38 +635,51 @@ def restore_from_json(json_content):
                     print(f"Failed to sync sequence for {table}: {sync_e}")
             db.session.commit()
 
-        if not data.get('chains'):
+        if not data.get("chains"):
             active_threads = Thread.query.all()
             for th in active_threads:
                 recalculate_chains(th.thread_id)
-            
+
         return True, "Success."
     except Exception as e:
         db.session.rollback()
         return False, str(e)
+
+
 def send_scheduled_backup():
     try:
         with app.app_context():
-            admins = BotUser.query.filter_by(role='admin').all()
-            if not admins: return
-            
+            admins = BotUser.query.filter_by(role="admin").all()
+            if not admins:
+                return
+
             backup_content = create_full_backup_json()
-            timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
             filename = f"backup_{timestamp}.json"
-            
+
             for admin in admins:
                 if request_bot:
-                    request_bot.send_document(admin.chat_id, backup_content.encode('utf-8'), visible_file_name=filename, caption=f"📦 Full Backup (JSON)")
+                    request_bot.send_document(
+                        admin.chat_id,
+                        backup_content.encode("utf-8"),
+                        visible_file_name=filename,
+                        caption=f"📦 Full Backup (JSON)",
+                    )
     except Exception as e:
         print(f"Backup failed: {e}")
-            
+
+
 # --- REQUEST BOT LOGIC ---
 if request_bot:
-    @request_bot.message_handler(commands=['start', 'help'])
-    def req_send_welcome(message):
-        request_bot.reply_to(message, "Hello! Write your requests here. \n\nTo get all requests as a list, type /list\nTo clear the list, type /clear\n\n(Enter password for Admin Mode)")
 
-    @request_bot.message_handler(commands=['logout'])
+    @request_bot.message_handler(commands=["start", "help"])
+    def req_send_welcome(message):
+        request_bot.reply_to(
+            message,
+            "Hello! Write your requests here. \n\nTo get all requests as a list, type /list\nTo clear the list, type /clear\n\n(Enter password for Admin Mode)",
+        )
+
+    @request_bot.message_handler(commands=["logout"])
     def handle_logout(message):
         with app.app_context():
             user = db.session.get(BotUser, message.chat.id)
@@ -482,28 +688,28 @@ if request_bot:
                 db.session.commit()
                 request_bot.reply_to(message, "ok")
 
-    @request_bot.message_handler(commands=['list'])
+    @request_bot.message_handler(commands=["list"])
     def req_list_requests(message):
         with app.app_context():
             reqs = PartnerRequest.query.order_by(PartnerRequest.id.asc()).all()
             if not reqs:
                 request_bot.reply_to(message, "📭 The request list is currently empty.")
                 return
-            
+
             msg = "📝 <b>List of requests:</b>\n\n"
             for i, r in enumerate(reqs, 1):
                 msg += f"{i}. {r.text}\n"
-            
+
             request_bot.reply_to(message, msg, parse_mode="HTML")
 
-    @request_bot.message_handler(commands=['clear'])
+    @request_bot.message_handler(commands=["clear"])
     def req_clear_requests(message):
         with app.app_context():
             PartnerRequest.query.delete()
             db.session.commit()
             request_bot.reply_to(message, "🗑 The list has been successfully cleared.")
 
-    @request_bot.message_handler(commands=['backup'])
+    @request_bot.message_handler(commands=["backup"])
     def handle_backup(message):
         with app.app_context():
             user = db.session.get(BotUser, message.chat.id)
@@ -512,20 +718,21 @@ if request_bot:
             else:
                 request_bot.reply_to(message, "bro, where is json")
 
-    @request_bot.message_handler(content_types=['document'])
+    @request_bot.message_handler(content_types=["document"])
     def handle_docs(message):
         with app.app_context():
             user = db.session.get(BotUser, message.chat.id)
-            if not user or user.role != "admin": return
-            
+            if not user or user.role != "admin":
+                return
+
         try:
             file_name = message.document.file_name
-            if not file_name.endswith('.json'):
+            if not file_name.endswith(".json"):
                 request_bot.reply_to(message, "❌ I need .json file")
                 return
             file_info = request_bot.get_file(message.document.file_id)
             downloaded_file = request_bot.download_file(file_info.file_path)
-            json_content = downloaded_file.decode('utf-8')
+            json_content = downloaded_file.decode("utf-8")
             request_bot.reply_to(message, "⏳ restoring...")
             with app.app_context():
                 success, msg = restore_from_json(json_content)
@@ -540,7 +747,7 @@ if request_bot:
     def handle_all_text(message):
         chat_id = message.chat.id
         txt = message.text.strip()
-        
+
         with app.app_context():
             pwd_hash = hashlib.sha256(txt.encode()).hexdigest()
             if pwd_hash == HASH_ADMIN:
@@ -554,8 +761,9 @@ if request_bot:
             new_req = PartnerRequest(text=txt)
             db.session.add(new_req)
             db.session.commit()
-            
+
         request_bot.reply_to(message, "✅ Added to the list!")
+
 
 def run_request_bot_thread():
     if request_bot:
@@ -565,289 +773,343 @@ def run_request_bot_thread():
         except Exception as e:
             print(f"Request Bot crash: {e}")
 
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not session.get('logged_in'):
-            return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        if not session.get("logged_in"):
+            return jsonify({"success": False, "error": "Unauthorized"}), 401
         return f(*args, **kwargs)
+
     return decorated_function
 
-@app.route('/api/login', methods=['POST'])
+
+@app.route("/api/login", methods=["POST"])
 def api_login():
-    pwd = request.json.get('password', '')
+    pwd = request.json.get("password", "")
     if hashlib.sha256(pwd.encode()).hexdigest() == HASH_WEB:
-        session['logged_in'] = True
-        return jsonify({'success': True})
-    return jsonify({'success': False})
+        session["logged_in"] = True
+        return jsonify({"success": True})
+    return jsonify({"success": False})
 
-@app.route('/api/logout', methods=['POST'])
+
+@app.route("/api/logout", methods=["POST"])
 def api_logout():
-    session.pop('logged_in', None)
-    return jsonify({'success': True})
+    session.pop("logged_in", None)
+    return jsonify({"success": True})
 
-@app.route('/api/get_week_info', methods=['POST'])
+
+@app.route("/api/get_week_info", methods=["POST"])
 def get_week_info():
-    week_id = request.json.get('week_id')
+    week_id = request.json.get("week_id")
     try:
         wc = db.session.get(WeekContext, week_id)
         if wc:
-            return jsonify({'success': True, 'header': wc.header, 'notes': wc.notes})
-        return jsonify({'success': True, 'header': '', 'notes': ''})
+            return jsonify({"success": True, "header": wc.header, "notes": wc.notes})
+        return jsonify({"success": True, "header": "", "notes": ""})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+        return jsonify({"success": False, "error": str(e)})
 
-@app.route('/api/update_week_context', methods=['POST'])
+
+@app.route("/api/update_week_context", methods=["POST"])
 @login_required
 def update_week_context():
     data = request.json
-    week_id = data.get('week_id')
+    week_id = data.get("week_id")
     try:
         wc = db.session.get(WeekContext, week_id)
         if not wc:
             wc = WeekContext(week_id=week_id)
             db.session.add(wc)
-        
-        wc.header = data.get('header', '')
-        wc.notes = data.get('notes', '')
-        db.session.commit()
-        return jsonify({'success': True})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
 
-@app.route('/')
+        wc.header = data.get("header", "")
+        wc.notes = data.get("notes", "")
+        db.session.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+
+@app.route("/")
 def index():
     try:
-        week_offset = request.args.get('offset', 0, type=int)
-        
+        week_offset = request.args.get("offset", 0, type=int)
+
         today = datetime.datetime.now(ZoneInfo("America/Chicago")).date()
         start_of_current_week = today - timedelta(days=today.weekday())
-        
+
         base_week = start_of_current_week + timedelta(weeks=week_offset)
 
         iso_year, iso_week, _ = base_week.isocalendar()
         current_week_id = f"{iso_year}-W{iso_week:02d}"
-        
+
         start_date = base_week - timedelta(days=35)
         end_date = base_week + timedelta(days=6)
         cal = ensure_calendar_entry(today)
-        
-        recent_cals = Calendar.query.filter(
-            Calendar.comments != "", 
-            Calendar.comments.is_not(None)
-        ).order_by(Calendar.actual_date.desc()).limit(10).all()
-        
+
+        recent_cals = (
+            Calendar.query.filter(
+                Calendar.comments != "", Calendar.comments.is_not(None)
+            )
+            .order_by(Calendar.actual_date.desc())
+            .limit(10)
+            .all()
+        )
+
         global_parsed_comments = []
         for c in recent_cals:
-            lines = [line for line in c.comments.split('\n') if line.strip()]
+            lines = [line for line in c.comments.split("\n") if line.strip()]
             day_comments = []
-            
+
             current_comment = None
-            
+
             for line in lines:
-                if line.startswith('[') and ']' in line:
+                if line.startswith("[") and "]" in line:
                     if current_comment:
                         day_comments.append(current_comment)
-                    
-                    end_bracket = line.find(']')
+
+                    end_bracket = line.find("]")
                     time_str = line[1:end_bracket]
-                    text_str = line[end_bracket+1:].strip()
-                    
+                    text_str = line[end_bracket + 1 :].strip()
+
                     current_comment = {
-                        'date': c.actual_date.strftime('%Y-%m-%d'), 
-                        'time': time_str, 
-                        'text': text_str
+                        "date": c.actual_date.strftime("%Y-%m-%d"),
+                        "time": time_str,
+                        "text": text_str,
                     }
                 else:
                     if current_comment:
-                        current_comment['text'] += "\n" + line
+                        current_comment["text"] += "\n" + line
                     else:
-                        current_comment = {'date': c.actual_date.strftime('%Y-%m-%d'), 'time': '', 'text': line}
-            
+                        current_comment = {
+                            "date": c.actual_date.strftime("%Y-%m-%d"),
+                            "time": "",
+                            "text": line,
+                        }
+
             if current_comment:
                 day_comments.append(current_comment)
-                
+
             day_comments.reverse()
             global_parsed_comments.extend(day_comments)
-                
+
         parsed_comments = global_parsed_comments
 
         board_items = BoardItem.query.order_by(BoardItem.id.desc()).all()
-        board_data = [{'id': b.id, 'text': b.text} for b in board_items]
+        board_data = [{"id": b.id, "text": b.text} for b in board_items]
 
         intent_today = IntentEntry.query.filter_by(entry_date=today).first()
         resil_today = ResilienceEntry.query.filter_by(entry_date=today).first()
 
         ctx = {
-            'off_routine': cal.off_routine_flag,
-            'off_reason': cal.off_routine_reason or "",
-            'bh_hydroxizine': cal.bh_hydroxizine,
-            'bh_ritalin': cal.bh_ritalin,
-            'bh_modafinil': cal.bh_modafinil,
-            'bh_caffeine': cal.bh_caffeine,
-            'bh_alcohol': cal.bh_alcohol,
-            'bh_thc': cal.bh_thc,
-            'intent_horizon': intent_today.horizon if intent_today else 'survival',
-            'intent_header': intent_today.content if intent_today else '',
-            'intent_notes': intent_today.notes if intent_today else '',
-            'resil_status': resil_today.status if resil_today else 'baseline',
-            'resil_header': resil_today.content if resil_today else '',
-            'resil_notes': resil_today.notes if resil_today else '',
-            'comment_list': parsed_comments,
-            'board_data': board_data,
-            'date_40k': cal.date_40k,
-            'week_40k': cal.week_40k
+            "off_routine": cal.off_routine_flag,
+            "off_reason": cal.off_routine_reason or "",
+            "bh_hydroxizine": cal.bh_hydroxizine,
+            "bh_ritalin": cal.bh_ritalin,
+            "bh_modafinil": cal.bh_modafinil,
+            "bh_caffeine": cal.bh_caffeine,
+            "bh_alcohol": cal.bh_alcohol,
+            "bh_thc": cal.bh_thc,
+            "intent_horizon": intent_today.horizon if intent_today else "survival",
+            "intent_header": intent_today.content if intent_today else "",
+            "intent_notes": intent_today.notes if intent_today else "",
+            "resil_status": resil_today.status if resil_today else "baseline",
+            "resil_header": resil_today.content if resil_today else "",
+            "resil_notes": resil_today.notes if resil_today else "",
+            "comment_list": parsed_comments,
+            "board_data": board_data,
+            "date_40k": cal.date_40k,
+            "week_40k": cal.week_40k,
         }
 
-        categories = ['work', 'scaffolding', 'family', 'quests', 'self care']
-        threads = Thread.query.filter(Thread.status == 'active').order_by(Thread.rank.desc()).all()
+        categories = ["work", "scaffolding", "family", "quests", "self care"]
+        threads = (
+            Thread.query.filter(Thread.status == "active")
+            .order_by(Thread.rank.desc())
+            .all()
+        )
         grouped_threads = {c: [] for c in categories}
-        
+
         week_headers = []
         for i in range(6):
-            w_start = start_date + timedelta(days=i*7)
+            w_start = start_date + timedelta(days=i * 7)
             iso_year, iso_week, _ = w_start.isocalendar()
             w_id = f"{iso_year}-W{iso_week:02d}"
             _, w_str = get_week_data(w_start)
-            
-            week_headers.append({'id': w_id, 'label': w_str})
-        
-        off_routine_days = {c.actual_date: True for c in Calendar.query.filter(Calendar.off_routine_flag == True).all()}
-        all_squares = Square.query.filter(Square.period >= start_date, Square.period <= end_date).all()
+
+            week_headers.append({"id": w_id, "label": w_str})
+
+        off_routine_days = {
+            c.actual_date: True
+            for c in Calendar.query.filter(Calendar.off_routine_flag == True).all()
+        }
+        all_squares = Square.query.filter(
+            Square.period >= start_date, Square.period <= end_date
+        ).all()
         sq_map = {(s.thread_id, s.period): s for s in all_squares}
-        
+
         for th in threads:
-            cat = th.category if th.category in grouped_threads else 'scaffolding'
+            cat = th.category if th.category in grouped_threads else "scaffolding"
             days = []
-            
+
             for i in range(42):
                 curr = start_date + timedelta(days=i)
                 sq = sq_map.get((th.thread_id, curr))
-                status = sq.status if sq else 'empty'
+                status = sq.status if sq else "empty"
                 is_off = off_routine_days.get(curr, False)
-                is_fulfilled = is_day_fulfilled(th, curr, sq_map)
-                days.append({
-                    'date': curr.strftime('%Y-%m-%d'), 
-                    'is_today': (curr == today), 
-                    'status': status, 
-                    'is_off_routine': is_off, 
-                    'is_fulfilled': is_fulfilled, 
-                    'is_padding': False,
-                    'miss_reason': sq.chain_end_reason if sq else ""
-                })
-            weeks = [days[i:i + 7] for i in range(0, len(days), 7)]
-            grouped_threads[cat].append({'info': th, 'weeks': weeks})
-            
-        return render_template(
-            'dashboard.html', 
-            grouped_threads=grouped_threads, 
-            categories=categories, 
-            ctx=ctx, 
-            today_date=today.strftime('%Y-%m-%d'), 
-            week_headers=week_headers, 
-            is_auth=session.get('logged_in', False),
-            current_offset=week_offset,
-            current_week_id=current_week_id 
-        )
-    except Exception as e: return f"CRITICAL ERROR: {str(e)}"
-    
 
-@app.route('/api/get_day_info', methods=['POST'])
+                is_padding = False
+                if th.cadence and th.cadence != "daily":
+                    try:
+                        scheduled_days = [
+                            int(x) for x in th.cadence.split(",") if x.isdigit()
+                        ]
+                        if scheduled_days and curr.weekday() not in scheduled_days:
+                            is_padding = True
+                    except:
+                        pass
+
+                days.append(
+                    {
+                        "date": curr.strftime("%Y-%m-%d"),
+                        "is_today": (curr == today),
+                        "status": status,
+                        "is_off_routine": is_off,
+                        "is_fulfilled": False,
+                        "is_padding": is_padding,
+                        "miss_reason": sq.chain_end_reason if sq else "",
+                    }
+                )
+
+            weeks = [days[i : i + 7] for i in range(0, len(days), 7)]
+            grouped_threads[cat].append({"info": th, "weeks": weeks})
+
+        return render_template(
+            "dashboard.html",
+            grouped_threads=grouped_threads,
+            categories=categories,
+            ctx=ctx,
+            today_date=today.strftime("%Y-%m-%d"),
+            week_headers=week_headers,
+            is_auth=session.get("logged_in", False),
+            current_offset=week_offset,
+            current_week_id=current_week_id,
+        )
+    except Exception as e:
+        return f"CRITICAL ERROR: {str(e)}"
+
+
+@app.route("/api/get_day_info", methods=["POST"])
 def get_day_info():
-    d_str = request.json.get('date')
+    d_str = request.json.get("date")
     try:
-        d_date = datetime.datetime.strptime(d_str, '%Y-%m-%d').date()
+        d_date = datetime.datetime.strptime(d_str, "%Y-%m-%d").date()
         cal = db.session.get(Calendar, d_date)
         intent = IntentEntry.query.filter_by(entry_date=d_date).first()
         resil = ResilienceEntry.query.filter_by(entry_date=d_date).first()
 
-        return jsonify({
-            'success': True,
-            'off': cal.off_routine_flag if cal else False,
-            'off_reason': cal.off_routine_reason if cal else "",
-            'bh_hydroxizine': cal.bh_hydroxizine if cal else False,
-            'bh_ritalin': cal.bh_ritalin if cal else False,
-            'bh_modafinil': cal.bh_modafinil if cal else False,
-            'bh_caffeine': cal.bh_caffeine if cal else False,
-            'bh_alcohol': cal.bh_alcohol if cal else False,
-            'bh_thc': cal.bh_thc if cal else False,
-            'intent_horizon': intent.horizon if intent else 'survival',
-            'intent_header': intent.content if intent else '',
-            'intent_notes': intent.notes if intent else '',
-            'resil_status': resil.status if resil else 'baseline',
-            'resil_header': resil.content if resil else '',
-            'resil_notes': resil.notes if resil else ''
-        })
+        return jsonify(
+            {
+                "success": True,
+                "off": cal.off_routine_flag if cal else False,
+                "off_reason": cal.off_routine_reason if cal else "",
+                "bh_hydroxizine": cal.bh_hydroxizine if cal else False,
+                "bh_ritalin": cal.bh_ritalin if cal else False,
+                "bh_modafinil": cal.bh_modafinil if cal else False,
+                "bh_caffeine": cal.bh_caffeine if cal else False,
+                "bh_alcohol": cal.bh_alcohol if cal else False,
+                "bh_thc": cal.bh_thc if cal else False,
+                "intent_horizon": intent.horizon if intent else "survival",
+                "intent_header": intent.content if intent else "",
+                "intent_notes": intent.notes if intent else "",
+                "resil_status": resil.status if resil else "baseline",
+                "resil_header": resil.content if resil else "",
+                "resil_notes": resil.notes if resil else "",
+            }
+        )
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+        return jsonify({"success": False, "error": str(e)})
 
-@app.route('/api/update_day_context', methods=['POST'])
+
+@app.route("/api/update_day_context", methods=["POST"])
 @login_required
 def update_day_context():
     data = request.json
-    d_str = data.get('date')
+    d_str = data.get("date")
     if d_str:
-        today_date = datetime.datetime.strptime(d_str, '%Y-%m-%d').date()
+        today_date = datetime.datetime.strptime(d_str, "%Y-%m-%d").date()
     else:
         today_date = datetime.datetime.now(ZoneInfo("America/Chicago")).date()
     cal = ensure_calendar_entry(today_date)
-    
-    if 'off_routine' in data: cal.off_routine_flag = data['off_routine']
-    if 'off_reason' in data: cal.off_routine_reason = data['off_reason']
-    
-    if 'bh_hydroxizine' in data: cal.bh_hydroxizine = data['bh_hydroxizine']
-    if 'bh_ritalin' in data: cal.bh_ritalin = data['bh_ritalin']
-    if 'bh_modafinil' in data: cal.bh_modafinil = data['bh_modafinil']
-    if 'bh_caffeine' in data: cal.bh_caffeine = data['bh_caffeine']
-    if 'bh_alcohol' in data: cal.bh_alcohol = data['bh_alcohol']
-    if 'bh_thc' in data: cal.bh_thc = data['bh_thc']
 
-    if 'intent_horizon' in data:
+    if "off_routine" in data:
+        cal.off_routine_flag = data["off_routine"]
+    if "off_reason" in data:
+        cal.off_routine_reason = data["off_reason"]
+
+    if "bh_hydroxizine" in data:
+        cal.bh_hydroxizine = data["bh_hydroxizine"]
+    if "bh_ritalin" in data:
+        cal.bh_ritalin = data["bh_ritalin"]
+    if "bh_modafinil" in data:
+        cal.bh_modafinil = data["bh_modafinil"]
+    if "bh_caffeine" in data:
+        cal.bh_caffeine = data["bh_caffeine"]
+    if "bh_alcohol" in data:
+        cal.bh_alcohol = data["bh_alcohol"]
+    if "bh_thc" in data:
+        cal.bh_thc = data["bh_thc"]
+
+    if "intent_horizon" in data:
         intent = IntentEntry.query.filter_by(entry_date=today_date).first()
         if not intent:
             intent = IntentEntry(entry_date=today_date)
             db.session.add(intent)
-        intent.horizon = data.get('intent_horizon', 'survival')
-        intent.content = data.get('intent_header', '')
-        intent.notes = data.get('intent_notes', '')
+        intent.horizon = data.get("intent_horizon", "survival")
+        intent.content = data.get("intent_header", "")
+        intent.notes = data.get("intent_notes", "")
 
-    if 'resil_status' in data:
+    if "resil_status" in data:
         resil = ResilienceEntry.query.filter_by(entry_date=today_date).first()
         if not resil:
             resil = ResilienceEntry(entry_date=today_date)
             db.session.add(resil)
-        resil.status = data.get('resil_status', 'baseline')
-        resil.content = data.get('resil_header', '')
-        resil.notes = data.get('resil_notes', '')
+        resil.status = data.get("resil_status", "baseline")
+        resil.content = data.get("resil_header", "")
+        resil.notes = data.get("resil_notes", "")
 
-    if 'comments' in data and data['comments']:
+    if "comments" in data and data["comments"]:
         timestamp = datetime.datetime.now(ZoneInfo("America/Chicago")).strftime("%H:%M")
         new_entry = f"[{timestamp}] {data['comments']}"
-        if cal.comments: cal.comments += "\n" + new_entry
-        else: cal.comments = new_entry
-        
-    db.session.commit()
-    return jsonify({'success': True})
+        if cal.comments:
+            cal.comments += "\n" + new_entry
+        else:
+            cal.comments = new_entry
 
-@app.route('/api/toggle_status', methods=['POST'])
+    db.session.commit()
+    return jsonify({"success": True})
+
+
+@app.route("/api/toggle_status", methods=["POST"])
 @login_required
 def toggle_status():
     data = request.json
-    t_id = data.get('thread_id')
-    d_str = data.get('date')
-    d_date = datetime.datetime.strptime(d_str, '%Y-%m-%d').date()
+    t_id = data.get("thread_id")
+    d_str = data.get("date")
+    d_date = datetime.datetime.strptime(d_str, "%Y-%m-%d").date()
     sq_id = f"{t_id}_{d_str}"
     sq = db.session.get(Square, sq_id)
     if not sq:
         sq = Square(square_id=sq_id, thread_id=t_id, period=d_date)
         db.session.add(sq)
-    sq.status = data.get('status')
-    sq.chain_end_reason = data.get('miss_reason', '')
+    sq.status = data.get("status")
+    sq.chain_end_reason = data.get("miss_reason", "")
     db.session.commit()
     recalculate_chains(t_id)
-    return jsonify({'success': True})
+    return jsonify({"success": True})
 
-@app.route('/api/add_thread', methods=['POST'])
+
+@app.route("/api/add_thread", methods=["POST"])
 @login_required
 def add_thread():
     try:
@@ -855,103 +1117,139 @@ def add_thread():
         max_rank = db.session.query(func.max(Thread.rank)).scalar() or 0
         today = date.today()
         new_th = Thread(
-            thread_name=data.get('name'), thread_name_redacted=data.get('redacted', ''),
-            category=data.get('category'), sub_category=data.get('sub_category', ''),
-            type=data.get('type', 'perpetual'), cadence=data.get('cadence', 'daily'),
-            status='active', rank=max_rank + 1, created_at=today, created_at_40k=get_week_data(today)[0]
+            thread_name=data.get("name"),
+            thread_name_redacted=data.get("redacted", ""),
+            category=data.get("category"),
+            sub_category=data.get("sub_category", ""),
+            type=data.get("type", "perpetual"),
+            cadence=data.get("cadence", "daily"),
+            status="active",
+            rank=max_rank + 1,
+            created_at=today,
+            created_at_40k=get_week_data(today)[0],
         )
         db.session.add(new_th)
         db.session.commit()
-        return jsonify({'success': True})
-    except Exception as e: return jsonify({'success': False, 'error': str(e)})
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
 
-@app.route('/api/delete_thread', methods=['POST'])
+
+@app.route("/api/delete_thread", methods=["POST"])
 @login_required
 def delete_thread():
-    t_id = request.json.get('id')
+    t_id = request.json.get("id")
     thread = db.session.get(Thread, t_id)
     if thread:
-        thread.status = 'deleted'
+        thread.status = "deleted"
         thread.closed_date = date.today()
         db.session.commit()
-        return jsonify({'success': True})
-    return jsonify({'success': False})
+        return jsonify({"success": True})
+    return jsonify({"success": False})
 
-@app.route('/api/edit_thread', methods=['POST'])
+
+@app.route("/api/edit_thread", methods=["POST"])
 @login_required
 def edit_thread():
     try:
         data = request.json
-        t_id = data.get('id')
+        t_id = data.get("id")
         thread = db.session.get(Thread, t_id)
-        
-        if thread:
-            thread.thread_name = data.get('name')
-            thread.thread_name_redacted = data.get('redacted', '')
-            thread.sub_category = data.get('sub_category', '')
-            thread.type = data.get('type', 'perpetual')
-            thread.cadence = data.get('cadence', 'daily')
-            db.session.commit()
-            return jsonify({'success': True})
-            
-        return jsonify({'success': False, 'error': 'Not found'})
-    except Exception as e: 
-        return jsonify({'success': False, 'error': str(e)})
 
-@app.route('/api/move_thread', methods=['POST'])
+        if thread:
+            thread.thread_name = data.get("name")
+            thread.thread_name_redacted = data.get("redacted", "")
+            thread.sub_category = data.get("sub_category", "")
+            thread.type = data.get("type", "perpetual")
+            thread.cadence = data.get("cadence", "daily")
+            db.session.commit()
+            return jsonify({"success": True})
+
+        return jsonify({"success": False, "error": "Not found"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+
+@app.route("/api/move_thread", methods=["POST"])
 @login_required
 def move_thread():
     data = request.json
-    t_id = data.get('id')
-    direction = data.get('direction')
-    
+    t_id = data.get("id")
+    direction = data.get("direction")
+
     thread = db.session.get(Thread, t_id)
-    if not thread: return jsonify({'success': False})
-    
-    query = Thread.query.filter(Thread.status == 'active', Thread.category == thread.category)
-    
-    if direction == 'up':
-        neighbor = query.filter(Thread.rank > thread.rank).order_by(Thread.rank.asc()).first()
+    if not thread:
+        return jsonify({"success": False})
+
+    query = Thread.query.filter(
+        Thread.status == "active", Thread.category == thread.category
+    )
+
+    if direction == "up":
+        neighbor = (
+            query.filter(Thread.rank > thread.rank).order_by(Thread.rank.asc()).first()
+        )
     else:
-        neighbor = query.filter(Thread.rank < thread.rank).order_by(Thread.rank.desc()).first()
-        
+        neighbor = (
+            query.filter(Thread.rank < thread.rank).order_by(Thread.rank.desc()).first()
+        )
+
     if neighbor:
         thread.rank, neighbor.rank = neighbor.rank, thread.rank
         db.session.commit()
-        
-    return jsonify({'success': True})
 
-@app.route('/calendar')
+    return jsonify({"success": True})
+
+
+@app.route("/calendar")
 @login_required
 def calendar():
-    return render_template('m_page.html')
+    return render_template("m_page.html")
+
 
 # --- STARTUP LOGIC ---
 with app.app_context():
     db.create_all()
 
-    for col in ['bh_hydroxizine', 'bh_ritalin', 'bh_modafinil', 'bh_caffeine', 'bh_alcohol', 'bh_thc']:
+    for col in [
+        "bh_hydroxizine",
+        "bh_ritalin",
+        "bh_modafinil",
+        "bh_caffeine",
+        "bh_alcohol",
+        "bh_thc",
+    ]:
         try:
-            db.session.execute(db.text(f"ALTER TABLE calendar ADD COLUMN {col} BOOLEAN DEFAULT FALSE"))
+            db.session.execute(
+                db.text(f"ALTER TABLE calendar ADD COLUMN {col} BOOLEAN DEFAULT FALSE")
+            )
             db.session.commit()
         except Exception:
             db.session.rollback()
-    
+
     try:
-        db.session.execute(db.text("ALTER TABLE intent_entries ADD COLUMN notes TEXT DEFAULT ''"))
+        db.session.execute(
+            db.text("ALTER TABLE intent_entries ADD COLUMN notes TEXT DEFAULT ''")
+        )
         db.session.commit()
     except Exception:
         db.session.rollback()
 
     try:
-        db.session.execute(db.text("ALTER TABLE intent_entries ADD COLUMN plan BOOLEAN DEFAULT FALSE"))
+        db.session.execute(
+            db.text("ALTER TABLE intent_entries ADD COLUMN plan BOOLEAN DEFAULT FALSE")
+        )
         db.session.commit()
     except Exception:
         db.session.rollback()
 
-    if db.engine.name == 'postgresql':
+    if db.engine.name == "postgresql":
         try:
-            db.session.execute(db.text("SELECT setval(pg_get_serial_sequence('threads', 'thread_id'), COALESCE((SELECT MAX(thread_id) FROM threads), 1))"))
+            db.session.execute(
+                db.text(
+                    "SELECT setval(pg_get_serial_sequence('threads', 'thread_id'), COALESCE((SELECT MAX(thread_id) FROM threads), 1))"
+                )
+            )
             db.session.commit()
             print("PostgreSQL sequence synced.")
         except Exception as e:
@@ -960,8 +1258,15 @@ with app.app_context():
 
     scheduler.init_app(app)
     scheduler.start()
-    if not scheduler.get_job('auto_backup'):
-        scheduler.add_job(id='auto_backup', func=send_scheduled_backup, trigger='cron', hour=23, minute=59)
+    if not scheduler.get_job("auto_backup"):
+        scheduler.add_job(
+            id="auto_backup",
+            func=send_scheduled_backup,
+            trigger="cron",
+            hour=23,
+            minute=59,
+        )
+
 
 def run_request_bot_thread():
     if request_bot:
@@ -971,26 +1276,14 @@ def run_request_bot_thread():
         except Exception as e:
             print(f"Request Bot crash: {e}")
 
-import socket
 
-def is_bot_running():
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind(("127.0.0.1", 45678))
-        s.listen(1)
-        global _bot_lock_socket
-        _bot_lock_socket = s
-        return False
-    except socket.error:
-        return True
+if not any(t.name == "RequestBotThread" for t in threading.enumerate()):
+    t2 = threading.Thread(target=run_request_bot_thread, name="RequestBotThread")
+    t2.daemon = True
+    t2.start()
 
-if not is_bot_running():
-    if not any(t.name == "RequestBotThread" for t in threading.enumerate()):
-        t2 = threading.Thread(target=run_request_bot_thread, name="RequestBotThread")
-        t2.daemon = True
-        t2.start()
 
-@app.route('/api/calendar/<cal_type>/<int:year>/<int:month>', methods=['GET'])
+@app.route("/api/calendar/<cal_type>/<int:year>/<int:month>", methods=["GET"])
 @login_required
 def get_calendar_data(cal_type, year, month):
     start_date = date(year, month + 1, 1)
@@ -1000,112 +1293,142 @@ def get_calendar_data(cal_type, year, month):
         end_date = date(year, month + 2, 1) - timedelta(days=1)
 
     data = {}
-    if cal_type == 'resilience':
-        entries = ResilienceEntry.query.filter(ResilienceEntry.entry_date >= start_date, ResilienceEntry.entry_date <= end_date).all()
+    if cal_type == "resilience":
+        entries = ResilienceEntry.query.filter(
+            ResilienceEntry.entry_date >= start_date,
+            ResilienceEntry.entry_date <= end_date,
+        ).all()
         for e in entries:
-            data[e.entry_date.day] = {"header": e.content or "", "notes": e.notes or "", "status": e.status or "baseline"}
+            data[e.entry_date.day] = {
+                "header": e.content or "",
+                "notes": e.notes or "",
+                "status": e.status or "baseline",
+            }
     else:
-        entries = IntentEntry.query.filter(IntentEntry.entry_date >= start_date, IntentEntry.entry_date <= end_date).all()
+        entries = IntentEntry.query.filter(
+            IntentEntry.entry_date >= start_date, IntentEntry.entry_date <= end_date
+        ).all()
         for e in entries:
-            db_horizon = e.horizon.strip() if e.horizon and e.horizon.strip() else "survival"
-            data[e.entry_date.day] = {"header": e.content or "", "notes": e.notes or "", "horizon": db_horizon, "plan": e.plan or False}
-    
+            db_horizon = (
+                e.horizon.strip() if e.horizon and e.horizon.strip() else "survival"
+            )
+            data[e.entry_date.day] = {
+                "header": e.content or "",
+                "notes": e.notes or "",
+                "horizon": db_horizon,
+                "plan": e.plan or False,
+            }
+
     return jsonify(data)
 
-@app.route('/api/calendar/<cal_type>/save', methods=['POST'])
+
+@app.route("/api/calendar/<cal_type>/save", methods=["POST"])
 @login_required
 def save_calendar_data(cal_type):
     req = request.json
-    d_date = datetime.datetime.strptime(req.get('date'), '%Y-%m-%d').date()
-    
-    if cal_type == 'resilience':
+    d_date = datetime.datetime.strptime(req.get("date"), "%Y-%m-%d").date()
+
+    if cal_type == "resilience":
         ResilienceEntry.query.filter_by(entry_date=d_date).delete()
-        db.session.add(ResilienceEntry(
-            entry_date=d_date, 
-            status=req.get('status', 'baseline'),
-            content=req.get('header', ''),
-            notes=req.get('notes', '')
-        ))
+        db.session.add(
+            ResilienceEntry(
+                entry_date=d_date,
+                status=req.get("status", "baseline"),
+                content=req.get("header", ""),
+                notes=req.get("notes", ""),
+            )
+        )
     else:
         IntentEntry.query.filter_by(entry_date=d_date).delete()
-        db.session.add(IntentEntry(
-            entry_date=d_date, 
-            horizon=req.get('horizon', 'survival'),
-            content=req.get('header', ''),
-            notes=req.get('notes', ''),
-            plan=req.get('plan', False)
-        ))
-        
+        db.session.add(
+            IntentEntry(
+                entry_date=d_date,
+                horizon=req.get("horizon", "survival"),
+                content=req.get("header", ""),
+                notes=req.get("notes", ""),
+                plan=req.get("plan", False),
+            )
+        )
+
     db.session.commit()
-    return jsonify({'success': True})
+    return jsonify({"success": True})
 
 
-@app.route('/api/aggregate/<int:year>', methods=['GET'])
+@app.route("/api/aggregate/<int:year>", methods=["GET"])
 @login_required
 def get_aggregate_data(year):
     start_date = date(year, 1, 1)
     end_date = date(year, 12, 31)
 
-    counts = db.session.query(
-        Thread.category,
-        Square.period,
-        func.count(Square.square_id)
-    ).join(Square, Thread.thread_id == Square.thread_id)\
-     .filter(Square.period >= start_date, Square.period <= end_date, Square.status == 'hit')\
-     .group_by(Thread.category, Square.period).all()
+    counts = (
+        db.session.query(Thread.category, Square.period, func.count(Square.square_id))
+        .join(Square, Thread.thread_id == Square.thread_id)
+        .filter(
+            Square.period >= start_date,
+            Square.period <= end_date,
+            Square.status == "hit",
+        )
+        .group_by(Thread.category, Square.period)
+        .all()
+    )
 
-    target_cats = ['work', 'quests', 'self care']
+    target_cats = ["work", "quests", "self care"]
     data = {cat: {} for cat in target_cats}
 
     for cat, period, count in counts:
-        cat_lower = cat.lower() if cat else 'scaffolding'
+        cat_lower = cat.lower() if cat else "scaffolding"
         if cat_lower in data:
-            data[cat_lower][period.strftime('%Y-%m-%d')] = count
+            data[cat_lower][period.strftime("%Y-%m-%d")] = count
 
     intent_entries = IntentEntry.query.filter(
-        IntentEntry.entry_date >= start_date,
-        IntentEntry.entry_date <= end_date
+        IntentEntry.entry_date >= start_date, IntentEntry.entry_date <= end_date
     ).all()
 
     intent_data = {}
     for entry in intent_entries:
         if entry.content or entry.notes:
-            intent_data[entry.entry_date.strftime('%Y-%m-%d')] = {
-                'horizon': entry.horizon or 'survival',
-                'plan': entry.plan or False
+            intent_data[entry.entry_date.strftime("%Y-%m-%d")] = {
+                "horizon": entry.horizon or "survival",
+                "plan": entry.plan or False,
             }
-            
-    data['intentionality'] = intent_data
 
-    return jsonify({'success': True, 'data': data, 'year': year})
-@app.route('/api/delete_log', methods=['POST'])
+    data["intentionality"] = intent_data
+
+    return jsonify({"success": True, "data": data, "year": year})
+
+
+@app.route("/api/delete_log", methods=["POST"])
 @login_required
 def delete_log():
     data = request.json
-    d_str = data.get('date')
-    time_str = data.get('time', '')
-    text_to_delete = data.get('text', '').replace('\r\n', '\n').strip()
+    d_str = data.get("date")
+    time_str = data.get("time", "")
+    text_to_delete = data.get("text", "").replace("\r\n", "\n").strip()
 
     try:
-        d_date = datetime.datetime.strptime(d_str, '%Y-%m-%d').date()
+        d_date = datetime.datetime.strptime(d_str, "%Y-%m-%d").date()
         cal = db.session.get(Calendar, d_date)
         if cal and cal.comments:
-            lines = [line for line in cal.comments.split('\n') if line.strip()]
+            lines = [line for line in cal.comments.split("\n") if line.strip()]
             parsed = []
             current_entry = None
 
             for line in lines:
-                if line.startswith('[') and ']' in line:
+                if line.startswith("[") and "]" in line:
                     if current_entry:
                         parsed.append(current_entry)
-                    end_idx = line.find(']')
-                    current_entry = {'time': line[1:end_idx], 'text': line[end_idx+1:].strip(), 'raw': [line]}
+                    end_idx = line.find("]")
+                    current_entry = {
+                        "time": line[1:end_idx],
+                        "text": line[end_idx + 1 :].strip(),
+                        "raw": [line],
+                    }
                 else:
                     if current_entry:
-                        current_entry['text'] += '\n' + line
-                        current_entry['raw'].append(line)
+                        current_entry["text"] += "\n" + line
+                        current_entry["raw"].append(line)
                     else:
-                        current_entry = {'time': '', 'text': line, 'raw': [line]}
+                        current_entry = {"time": "", "text": line, "raw": [line]}
 
             if current_entry:
                 parsed.append(current_entry)
@@ -1113,17 +1436,22 @@ def delete_log():
             new_raw_lines = []
             deleted = False
             for p in parsed:
-                if not deleted and p['time'] == time_str and p['text'].strip() == text_to_delete:
-                    deleted = True 
+                if (
+                    not deleted
+                    and p["time"] == time_str
+                    and p["text"].strip() == text_to_delete
+                ):
+                    deleted = True
                 else:
-                    new_raw_lines.extend(p['raw'])
+                    new_raw_lines.extend(p["raw"])
 
-            cal.comments = '\n'.join(new_raw_lines)
+            cal.comments = "\n".join(new_raw_lines)
             db.session.commit()
 
-        return jsonify({'success': True})
+        return jsonify({"success": True})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+        return jsonify({"success": False, "error": str(e)})
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000, debug=False, use_reloader=False)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8000, debug=False, use_reloader=False)
