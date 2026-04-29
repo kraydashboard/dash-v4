@@ -343,7 +343,7 @@ function submitNewThread() {
         redacted: document.getElementById('newThreadRedacted').value,
         sub_category: document.getElementById('newThreadSubCat').value,
         type: document.getElementById('newThreadType').value,
-        cadence: document.getElementById('newThreadCadence').value,
+        cadence: getCadenceValue('new'),
         time_of_day: document.getElementById('newThreadTime').value
     };
     fetch('/api/add_thread', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(r => r.json()).then(d => { if (d.success) location.reload(); else alert(d.error); });
@@ -355,7 +355,7 @@ function openEditModal(id, name, redacted, subCat, type, cadence, time_of_day) {
     document.getElementById('editThreadRedacted').value = redacted || '';
     document.getElementById('editThreadSubCat').value = subCat || '';
     document.getElementById('editThreadType').value = type || 'perpetual';
-    document.getElementById('editThreadCadence').value = cadence || 'daily';
+    setCadenceValue('edit', cadence);
     document.getElementById('editThreadTime').value = time_of_day || 'unspecified';
     showModalWindow('editThreadModal');
 }
@@ -367,7 +367,7 @@ function submitEditThread() {
         redacted: document.getElementById('editThreadRedacted').value,
         sub_category: document.getElementById('editThreadSubCat').value,
         type: document.getElementById('editThreadType').value,
-        cadence: document.getElementById('editThreadCadence').value,
+        cadence: getCadenceValue('edit'),
         time_of_day: document.getElementById('editThreadTime').value
     };
     fetch('/api/edit_thread', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(r => r.json()).then(d => { if (d.success) location.reload(); else alert(d.error); });
@@ -637,4 +637,36 @@ function saveWeekContext() {
     fetch('/api/update_week_context', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
     }).then(() => location.reload());
+}
+
+function toggleCadenceMode(prefix) {
+    const mode = document.getElementById(prefix + 'ThreadCadenceMode').value;
+    document.getElementById(prefix + 'ThreadDays').style.display = (mode === 'specific') ? 'flex' : 'none';
+}
+
+function getCadenceValue(prefix) {
+    const mode = document.getElementById(prefix + 'ThreadCadenceMode').value;
+    if (mode === 'daily') return 'daily';
+    const checkboxes = document.querySelectorAll('#' + prefix + 'ThreadDays input:checked');
+    return Array.from(checkboxes).map(cb => cb.value).join(',');
+}
+
+function setCadenceValue(prefix, val) {
+    const modeSelect = document.getElementById(prefix + 'ThreadCadenceMode');
+    const daysDiv = document.getElementById(prefix + 'ThreadDays');
+    const checkboxes = daysDiv.querySelectorAll('input');
+    
+    checkboxes.forEach(cb => cb.checked = false);
+
+    if (!val || val === 'daily' || !val.includes(',')) {
+        modeSelect.value = 'daily';
+        daysDiv.style.display = 'none';
+    } else {
+        modeSelect.value = 'specific';
+        daysDiv.style.display = 'flex';
+        val.split(',').forEach(d => {
+            const cb = daysDiv.querySelector(`input[value="${d}"]`);
+            if (cb) cb.checked = true;
+        });
+    }
 }
