@@ -724,6 +724,10 @@
             line-height: 1;
         }
 
+        .habit-cell.derivative-cell[data-reason]::before {
+            font-size: 7px;
+        }
+
         .habit-cell[data-reason]:not(.completed):not(.miss)::before {
             color: #1a1a1a;
         }
@@ -1806,16 +1810,6 @@
             border-radius: 2px;
             border-width: 1px !important;
             margin: 0 !important;
-        }
-
-        .habit-cell.derivative-cell.completed {
-            background: #777;
-            border-color: #777;
-        }
-
-        .habit-cell.derivative-cell.completed.past-week {
-            background: #a5a5a5;
-            border-color: #a5a5a5;
         }
 
         .branch-icon {
