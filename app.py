@@ -448,7 +448,6 @@ def create_full_backup_json():
 def restore_from_json(json_content):
     try:
         data = json.loads(json_content)
-        # Очищення бази перед відновленням
         db.session.query(WeekContext).delete()
         db.session.query(Square).delete()
         db.session.query(Chain).delete()
@@ -460,15 +459,12 @@ def restore_from_json(json_content):
         db.session.query(BotUser).delete()
         db.session.query(PartnerRequest).delete()
 
-        # --- ФІЛЬТР ДЛЯ СИРІТ ---
-        # Збираємо всі існуючі ID звичок, щоб відсіяти старі непотрібні дані
         valid_threads = {t["thread_id"] for t in data.get("threads", [])}
         valid_chains = {
             c["chain_id"]
             for c in data.get("chains", [])
             if c["thread_id"] in valid_threads
         }
-        # ------------------------
 
         for w in data.get("week_contexts", []):
             db.session.add(
@@ -508,7 +504,7 @@ def restore_from_json(json_content):
 
         for c in data.get("chains", []):
             if c["thread_id"] not in valid_threads:
-                continue  # Пропускаємо ланцюжки для давно видалених звичок
+                continue
 
             start_date = (
                 datetime.datetime.strptime(c["chain_start_date"], "%Y-%m-%d").date()
@@ -532,12 +528,12 @@ def restore_from_json(json_content):
 
         for s in data.get("squares", []):
             if s["thread_id"] not in valid_threads:
-                continue  # Пропускаємо квадратики для давно видалених звичок
+                continue 
 
             chain_id = s.get("chain_id")
             if chain_id not in valid_chains:
                 chain_id = (
-                    None  # Якщо ланцюжок відсутній, просто обнуляємо його зв'язок
+                    None
                 )
 
             d_date = datetime.datetime.strptime(s["period"], "%Y-%m-%d").date()
