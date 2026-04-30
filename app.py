@@ -33,7 +33,7 @@ if database_url:
         database_url = database_url.replace("postgres://", "postgresql://", 1)
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 else:
-    if os.path.isdir('/data'):
+    if os.path.isdir("/data"):
         app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:////data/Life_tracker.db"
     else:
         db_filename = "Life_tracker.db"
@@ -86,6 +86,7 @@ class Thread(db.Model):
     sub_category = db.Column(db.String(50))
     type = db.Column(db.String(20))
     cadence = db.Column(db.String(50))
+    parent_id = db.Column(db.Integer, db.ForeignKey("threads.thread_id"), nullable=True)
 
 
 class Chain(db.Model):
@@ -532,9 +533,7 @@ def restore_from_json(json_content):
 
             chain_id = s.get("chain_id")
             if chain_id not in valid_chains:
-                chain_id = (
-                    None
-                )
+                chain_id = None
 
             d_date = datetime.datetime.strptime(s["period"], "%Y-%m-%d").date()
             sq = Square(
@@ -666,7 +665,7 @@ def send_scheduled_backup():
                         visible_file_name=json_filename,
                         caption=f"📦 Full Backup (JSON)",
                     )
-                    
+
                     if db_path and os.path.exists(db_path):
                         db_filename = f"Life_tracker_{timestamp}.db"
                         with open(db_path, "rb") as f:
@@ -674,7 +673,7 @@ def send_scheduled_backup():
                                 admin.chat_id,
                                 f,
                                 visible_file_name=db_filename,
-                                caption=f"🗄 Full Backup (SQLite DB)"
+                                caption=f"🗄 Full Backup (SQLite DB)",
                             )
     except Exception as e:
         print(f"Backup failed: {e}")
@@ -735,23 +734,28 @@ if request_bot:
             user = db.session.get(BotUser, message.chat.id)
             if user and user.role == "admin":
                 db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
-                
+
                 if db_uri.startswith("sqlite:////data/"):
                     db_path = db_uri.replace("sqlite:///", "")
-                    
+
                     if os.path.exists(db_path):
-                        request_bot.reply_to(message, "⏳ Завантажую файл бази...")
+                        request_bot.reply_to(message, "⏳ Uploading database file...")
                         with open(db_path, "rb") as f:
                             request_bot.send_document(
-                                message.chat.id, 
-                                f, 
-                                visible_file_name="Life_tracker.db", 
-                                caption="📦 Оригінальний файл бази SQLite (з тому /data/)"
+                                message.chat.id,
+                                f,
+                                visible_file_name="Life_tracker.db",
+                                caption="📦 Original SQLite database file (from /data/ volume)",
                             )
                     else:
-                        request_bot.reply_to(message, "❌ Файл бази даних не знайдено в /data/.")
+                        request_bot.reply_to(
+                            message, "❌ Database file not found in /data/."
+                        )
                 else:
-                    request_bot.reply_to(message, "❌ Ця функція доступна ЛИШЕ коли база лежить у томі /data/ (на сервері).")
+                    request_bot.reply_to(
+                        message,
+                        "❌ This feature is ONLY available when the database is located in the /data/ volume (on the server).",
+                    )
             else:
                 request_bot.reply_to(message, "bro, who are you?")
 
@@ -779,25 +783,33 @@ if request_bot:
 
             elif file_name.endswith(".db"):
                 db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
-                
+
                 if db_uri.startswith("sqlite:////data/"):
                     db_path = db_uri.replace("sqlite:///", "")
-                    
-                    request_bot.reply_to(message, "⏳ Замінюю файл бази даних у /data/...")
-                    
+
+                    request_bot.reply_to(
+                        message, "⏳ Replacing database file in /data/..."
+                    )
+
                     with app.app_context():
                         db.engine.dispose()
-                        
-                        with open(db_path, 'wb') as f:
+
+                        with open(db_path, "wb") as f:
                             f.write(downloaded_file)
-                            
-                    request_bot.reply_to(message, "✅ Базу SQLite в /data/ успішно замінено! Все запрацює при наступному запиті.")
+
+                    request_bot.reply_to(
+                        message,
+                        "✅ SQLite database in /data/ successfully replaced! Changes will take effect on the next request.",
+                    )
                 else:
-                    request_bot.reply_to(message, "❌ Заміна файлу .db дозволена ТІЛЬКИ якщо програма запущена на сервері з томом /data/.")
-            
+                    request_bot.reply_to(
+                        message,
+                        "❌ Replacing the .db file is ONLY allowed if the app is running on a server with a /data/ volume.",
+                    )
+
             else:
-                request_bot.reply_to(message, "❌ Відправ мені .json або .db файл.")
-                
+                request_bot.reply_to(message, "❌ Please send me a .json or .db file."
+
         except Exception as e:
             request_bot.reply_to(message, f"Error: {e}")
 
@@ -892,10 +904,8 @@ def update_week_context():
 def index():
     try:
         week_offset = request.args.get("offset", 0, type=int)
-
         today = datetime.datetime.now(ZoneInfo("America/Chicago")).date()
         start_of_current_week = today - timedelta(days=today.weekday())
-
         base_week = start_of_current_week + timedelta(weeks=week_offset)
 
         iso_year, iso_week, _ = base_week.isocalendar()
@@ -903,7 +913,14 @@ def index():
 
         start_date = base_week - timedelta(days=35)
         end_date = base_week + timedelta(days=6)
+
         cal = ensure_calendar_entry(today)
+        all_active = Thread.query.filter(Thread.status == "active").all()
+
+        all_squares = Square.query.filter(
+            Square.period >= start_date, Square.period <= end_date
+        ).all()
+        sq_map = {(s.thread_id, s.period): s for s in all_squares}
 
         recent_cals = (
             Calendar.query.filter(
@@ -913,48 +930,25 @@ def index():
             .limit(10)
             .all()
         )
-
         global_parsed_comments = []
         for c in recent_cals:
             lines = [line for line in c.comments.split("\n") if line.strip()]
-            day_comments = []
-
             current_comment = None
-
             for line in lines:
                 if line.startswith("[") and "]" in line:
                     if current_comment:
-                        day_comments.append(current_comment)
-
-                    end_bracket = line.find("]")
-                    time_str = line[1:end_bracket]
-                    text_str = line[end_bracket + 1 :].strip()
-
+                        global_parsed_comments.append(current_comment)
+                    idx = line.find("]")
                     current_comment = {
                         "date": c.actual_date.strftime("%Y-%m-%d"),
-                        "time": time_str,
-                        "text": text_str,
+                        "time": line[1:idx],
+                        "text": line[idx + 1 :].strip(),
                     }
-                else:
-                    if current_comment:
-                        current_comment["text"] += "\n" + line
-                    else:
-                        current_comment = {
-                            "date": c.actual_date.strftime("%Y-%m-%d"),
-                            "time": "",
-                            "text": line,
-                        }
-
+                elif current_comment:
+                    current_comment["text"] += "\n" + line
             if current_comment:
-                day_comments.append(current_comment)
-
-            day_comments.reverse()
-            global_parsed_comments.extend(day_comments)
-
-        parsed_comments = global_parsed_comments
-
-        board_items = BoardItem.query.order_by(BoardItem.id.desc()).all()
-        board_data = [{"id": b.id, "text": b.text} for b in board_items]
+                global_parsed_comments.append(current_comment)
+        global_parsed_comments.reverse()
 
         intent_today = IntentEntry.query.filter_by(entry_date=today).first()
         resil_today = ResilienceEntry.query.filter_by(entry_date=today).first()
@@ -974,73 +968,78 @@ def index():
             "resil_status": resil_today.status if resil_today else "baseline",
             "resil_header": resil_today.content if resil_today else "",
             "resil_notes": resil_today.notes if resil_today else "",
-            "comment_list": parsed_comments,
-            "board_data": board_data,
+            "comment_list": global_parsed_comments,
             "date_40k": cal.date_40k,
             "week_40k": cal.week_40k,
         }
 
         categories = ["work", "scaffolding", "family", "quests", "self care"]
-        threads = (
-            Thread.query.filter(Thread.status == "active")
-            .order_by(Thread.rank.desc())
-            .all()
-        )
         grouped_threads = {c: [] for c in categories}
+        from collections import defaultdict
+
+        for cat in categories:
+            cat_threads = [
+                t for t in all_active if (t.category or "scaffolding") == cat
+            ]
+            active_ids_in_cat = {t.thread_id for t in cat_threads}
+
+            parent_to_children = defaultdict(list)
+            for t in cat_threads:
+                if t.parent_id and t.parent_id in active_ids_in_cat:
+                    parent_to_children[t.parent_id].append(t)
+
+            roots = [
+                t
+                for t in cat_threads
+                if not t.parent_id or t.parent_id not in active_ids_in_cat
+            ]
+            roots.sort(key=lambda x: x.rank, reverse=True)
+
+            sorted_cat_threads = []
+            for r in roots:
+                sorted_cat_threads.append(r)
+                children = sorted(
+                    parent_to_children[r.thread_id], key=lambda x: x.rank, reverse=True
+                )
+                sorted_cat_threads.extend(children)
+
+            for th in sorted_cat_threads:
+                days = []
+                for i in range(42):
+                    curr = start_date + timedelta(days=i)
+                    sq = sq_map.get((th.thread_id, curr))
+
+                    is_padding = False
+                    if th.cadence and th.cadence != "daily":
+                        try:
+                            sched = [
+                                int(x) for x in th.cadence.split(",") if x.isdigit()
+                            ]
+                            if sched and curr.weekday() not in sched:
+                                is_padding = True
+                        except:
+                            pass
+
+                    days.append(
+                        {
+                            "date": curr.strftime("%Y-%m-%d"),
+                            "is_today": (curr == today),
+                            "status": sq.status if sq else "empty",
+                            "is_padding": is_padding,
+                            "miss_reason": sq.chain_end_reason if sq else "",
+                        }
+                    )
+                grouped_threads[cat].append(
+                    {"info": th, "weeks": [days[j : j + 7] for j in range(0, 42, 7)]}
+                )
 
         week_headers = []
         for i in range(6):
             w_start = start_date + timedelta(days=i * 7)
-            iso_year, iso_week, _ = w_start.isocalendar()
-            w_id = f"{iso_year}-W{iso_week:02d}"
-            _, w_str = get_week_data(w_start)
-
-            week_headers.append({"id": w_id, "label": w_str})
-
-        off_routine_days = {
-            c.actual_date: True
-            for c in Calendar.query.filter(Calendar.off_routine_flag == True).all()
-        }
-        all_squares = Square.query.filter(
-            Square.period >= start_date, Square.period <= end_date
-        ).all()
-        sq_map = {(s.thread_id, s.period): s for s in all_squares}
-
-        for th in threads:
-            cat = th.category if th.category in grouped_threads else "scaffolding"
-            days = []
-
-            for i in range(42):
-                curr = start_date + timedelta(days=i)
-                sq = sq_map.get((th.thread_id, curr))
-                status = sq.status if sq else "empty"
-                is_off = off_routine_days.get(curr, False)
-
-                is_padding = False
-                if th.cadence and th.cadence != "daily":
-                    try:
-                        scheduled_days = [
-                            int(x) for x in th.cadence.split(",") if x.isdigit()
-                        ]
-                        if scheduled_days and curr.weekday() not in scheduled_days:
-                            is_padding = True
-                    except:
-                        pass
-
-                days.append(
-                    {
-                        "date": curr.strftime("%Y-%m-%d"),
-                        "is_today": (curr == today),
-                        "status": status,
-                        "is_off_routine": is_off,
-                        "is_fulfilled": False,
-                        "is_padding": is_padding,
-                        "miss_reason": sq.chain_end_reason if sq else "",
-                    }
-                )
-
-            weeks = [days[i : i + 7] for i in range(0, len(days), 7)]
-            grouped_threads[cat].append({"info": th, "weeks": weeks})
+            w_id = f"{w_start.isocalendar()[0]}-W{w_start.isocalendar()[1]:02d}"
+            week_headers.append(
+                {"id": w_id, "label": f"Week {w_start.isocalendar()[1]}"}
+            )
 
         return render_template(
             "dashboard.html",
@@ -1181,6 +1180,7 @@ def add_thread():
             sub_category=data.get("sub_category", ""),
             type=data.get("type", "perpetual"),
             cadence=data.get("cadence", "daily"),
+            parent_id=data.get("parent_id"),
             status="active",
             rank=max_rank + 1,
             created_at=today,
@@ -1220,6 +1220,17 @@ def edit_thread():
             thread.sub_category = data.get("sub_category", "")
             thread.type = data.get("type", "perpetual")
             thread.cadence = data.get("cadence", "daily")
+
+            p_id = data.get("parent_id")
+            new_parent_id = int(p_id) if p_id else None
+
+            if new_parent_id is not None and new_parent_id != thread.parent_id:
+                has_children = Thread.query.filter_by(parent_id=thread.thread_id, status='active').first()
+                if has_children:
+                    return jsonify({"success": False, "error": "This habit already has derivative habits, so it cannot become a derivative itself."})
+
+            thread.parent_id = new_parent_id
+
             db.session.commit()
             return jsonify({"success": True})
 
@@ -1240,7 +1251,9 @@ def move_thread():
         return jsonify({"success": False})
 
     query = Thread.query.filter(
-        Thread.status == "active", Thread.category == thread.category
+        Thread.status == "active", 
+        Thread.category == thread.category,
+        Thread.parent_id == thread.parent_id
     )
 
     if direction == "up":
@@ -1300,6 +1313,18 @@ with app.app_context():
         db.session.commit()
     except Exception:
         db.session.rollback()
+
+    try:
+        db.session.execute(
+            db.text(
+                "ALTER TABLE threads ADD COLUMN parent_id INTEGER REFERENCES threads(thread_id)"
+            )
+        )
+        db.session.commit()
+        print("Column parent_id added successfully.")
+    except Exception as e:
+        db.session.rollback()
+        print(f"Migration note (parent_id): {e}")
 
     if db.engine.name == "postgresql":
         try:
