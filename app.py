@@ -528,7 +528,7 @@ def restore_from_json(json_content):
 
         for s in data.get("squares", []):
             if s["thread_id"] not in valid_threads:
-                continue 
+                continue
 
             chain_id = s.get("chain_id")
             if chain_id not in valid_chains:
