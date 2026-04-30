@@ -35,6 +35,7 @@
                 %}style="right: 85px;" {% endif %}>📝 Log</button>
 
             <div class="controls">
+                <button class="control-btn" onclick="toggleQuickEdit()">⚙️ Quick view</button>
                 <div class="toggle-group">
                     <button class="tgl-btn sort-tgl" data-mode="aggregate"
                         onclick="setSortMode('aggregate')">Helicopter</button>
@@ -43,6 +44,7 @@
                     <button class="tgl-btn sort-tgl" data-mode="calendar"
                         onclick="setSortMode('calendar')">Calendar</button>
                 </div>
+                <button id="focusBtn" class="control-btn" onclick="toggleFocusMode()">🎯 Focus</button>
 
                 {% if is_auth %}
                 <button class="control-btn mobile-menu-btn" onclick="toggleMobileMenu()">⋮</button>
@@ -178,503 +180,598 @@
 
                         {% for item in grouped_threads[cat] %}
                         {% set ns_sort.idx = ns_sort.idx + 1 %}
+                        {% set is_sub = item.info.parent_id is not none %}
 
-                        <div class="habit-label" data-idx="{{ ns_sort.idx }}" data-cat="{{ cat }}"
-                            data-rank="{{ item.info.rank }}"> <span class="habit-name">{{
-                                item.info.thread_name }}</span>
-                            <div class="label-controls">
-                                <button class="l-btn" onclick="moveThread('{{ item.info.thread_id }}', 'up')">↑</button>
-                                <button class="l-btn"
-                                    onclick="moveThread('{{ item.info.thread_id }}', 'down')">↓</button>
-                                <button class="l-btn"
-                                    onclick="openEditModal('{{ item.info.thread_id }}', '{{ item.info.thread_name }}', '{{ item.info.thread_name_redacted or '' }}', '{{ item.info.sub_category or '' }}', '{{ item.info.type }}', '{{ item.info.cadence }}')">✎</button>
-                                <button class="l-btn red"
-                                    onclick="deleteThread('{{ item.info.thread_id }}', '{{ item.info.thread_name }}')">×</button>
-                            </div>
-                        </div>
-
-                        {% for week in item.weeks %}
-                        {% set w_idx = loop.index0 %}
-                        {% set is_last_week = loop.last %}
-                        {% for day in week %}
-                        {% set d_idx = loop.index0 %}
-                        {% set current_col = 2 + (w_idx * 8) + d_idx %}
-
-                        <div class="habit-cell {% if day.status == 'hit' %}completed{% endif %} {% if day.is_today %}is-today{% endif %} {% if not is_last_week %}past-week{% endif %} {% if day.is_padding %}padding{% endif %}"
-                            style="grid-column: {{ current_col }};" data-id="{{ item.info.thread_id }}"
-                            data-date="{{ day.date }}" data-rank="{{ item.info.rank }}" data-status="{{ day.status }}"
-                            data-week="{{ w_idx }}" data-idx="{{ ns_sort.idx }}" data-cat="{{ cat }}" {% if
-                            day.miss_reason %}data-reason="{{ day.miss_reason }}" {% endif %}
-                            onclick="handleCellClick(this)" oncontextmenu="handleRightClick(event, this)">
-                        </div>
-                        {% endfor %}
-                        {% endfor %}
-                        {% endfor %}
-                        {% endfor %}
-
-                    </div>
-                </div>
-
-                <div class="grid-wrapper mobile-only">
-                    <div class="grid-container"
-                        style="grid-template-columns: max-content repeat(7, 14px); row-gap: 2px;">
-                        {% if week_headers %}
-                        {% set last_header = week_headers[-1] %}
-                        <div class="week-band" style="grid-column: 2 / span 7;">
-                            <span class="week-band-label" onclick="openWeekContextModal('{{ last_header.id }}')">
-                                {{ last_header.label }}
-                            </span>
-                            <span class="week-band-line"></span>
-                        </div>
-
-                        {% set days_letters = ['M','T','W','T','F','S','S'] %}
-                        {% set last_week_days = grouped_threads[categories[0]][0].weeks[-1] %}
-                        {% for day in last_week_days %}
-                        {% set col = 2 + loop.index0 %}
-                        <div class="day-date" style="grid-column: {{ col }};"
-                            onclick="openContextModalForDate('{{ day.date }}')">{{ day.date.split('-')[-1] }}</div>
-
-                        <div class="day-letter" style="grid-column: {{ col }};">
-                            {{ days_letters[loop.index0] }}
-                            {% if day.is_off_routine %}
-                            <span class="off-routine-cross">×</span>
-                            {% endif %}
-                        </div>
-
-                        {% endfor %}
-
+                        {% set ns_child = namespace(has=false) %}
+                        {% for c_item in grouped_threads[cat] %}
+                        {% if c_item.info.parent_id == item.info.thread_id %}
+                        {% set ns_child.has = true %}
                         {% endif %}
+                        {% endfor %}
 
-                        {% set ns_sort = namespace(idx=0) %}
-                        {% for cat in categories %}
-                        <div class="category-header type-header" data-cat="{{ cat }}">
-                            <span>{{ cat|upper }}</span>
-                            {% if is_auth %}
-                            <button class="cat-add-btn" onclick="openAddModal('{{ cat }}')">＋</button>
-                            {% endif %}
-                        </div>
+                        {% set is_last_child = false %}
+                        {% if is_sub %}
+                        {% set next_item = grouped_threads[cat][loop.index0 + 1] if loop.index0 + 1 <
+                            grouped_threads[cat]|length else none %} {% if next_item is none or next_item.info.parent_id
+                            !=item.info.parent_id %} {% set is_last_child=true %} {% endif %} {% endif %} <div
+                            class="habit-label {% if is_sub %}is-derivative{% endif %}" data-idx="{{ ns_sort.idx }}"
+                            data-cat="{{ cat }}" data-rank="{{ item.info.rank }}">
+                            <div class="quick-edit-panel qe-panel" data-id="{{ item.info.thread_id }}"
+                                data-name="{{ item.info.thread_name }}"
+                                data-redacted="{{ item.info.thread_name_redacted or '' }}"
+                                data-subcat="{{ item.info.sub_category or '' }}" data-type="{{ item.info.type }}"
+                                data-time="{{ item.info.time_of_day or 'unspecified' }}">
 
-                        {% for item in grouped_threads[cat] %}
-                        {% set ns_sort.idx = ns_sort.idx + 1 %}
+                                <select class="qe-parent" autocomplete="off" onchange="quickEditSave('{{ item.info.thread_id }}', 'parent')" {% if ns_child.has %}disabled title="Impossible, as it already has derivative habits"{% endif %}>
+                                    <option value="">No Parent</option>
+                                    {% for p_item in grouped_threads[cat] %}
+                                    {% if not p_item.info.parent_id and p_item.info.thread_id != item.info.thread_id %}
+                                    <option value="{{ p_item.info.thread_id }}" {% if
+                                        item.info.parent_id==p_item.info.thread_id %}selected{% endif %}>
+                                        {{ p_item.info.thread_name }}
+                                    </option>
+                                    {% endif %}
+                                    {% endfor %}
+                                </select>
 
-                        <div class="habit-label" data-idx="{{ ns_sort.idx }}" data-cat="{{ cat }}"
-                            data-rank="{{ item.info.rank }}">
-                            <span class="habit-name">{{ item.info.thread_name }}</span>
+                                <div class="qe-cadence">
+                                    {% set c_str = item.info.cadence|string %}
+                                    {% set is_d = (c_str == 'daily') %}
+
+                                    {% for d_val, d_lbl in [('0','M'), ('1','T'), ('2','W'), ('3','T'), ('4','F'),
+                                    ('5','S'), ('6','S')] %}
+                                    <label class="qe-day-tgl">
+                                        <input type="checkbox" value="{{ d_val }}" {% if is_d or d_val in c_str
+                                            %}checked{% endif %}
+                                            onchange="quickEditSave('{{ item.info.thread_id }}', 'cadence')">
+                                        <span class="qe-day-box">{{ d_lbl }}</span>
+                                    </label>
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <span class="habit-name">
+                                {% if is_sub %}
+                                <span class="branch-icon">{% if is_last_child %}└─{% else %}├─{% endif %}</span>
+                                {% endif %}
+                                {{ item.info.thread_name }}
+                            </span>
                             <div class="label-controls">
                                 <button class="l-btn" onclick="moveThread('{{ item.info.thread_id }}', 'up')">↑</button>
                                 <button class="l-btn"
                                     onclick="moveThread('{{ item.info.thread_id }}', 'down')">↓</button>
                                 <button class="l-btn"
-                                    onclick="openEditModal('{{ item.info.thread_id }}', '{{ item.info.thread_name }}', '{{ item.info.thread_name_redacted or '' }}', '{{ item.info.sub_category or '' }}', '{{ item.info.type }}', '{{ item.info.cadence }}')">✎</button>
+                                    onclick="openEditModal('{{ item.info.thread_id }}', '{{ item.info.thread_name }}', '{{ item.info.thread_name_redacted or '' }}', '{{ item.info.sub_category or '' }}', '{{ item.info.type }}', '{{ item.info.cadence }}', '{{ item.info.time_of_day or 'unspecified' }}', '{{ item.info.parent_id or '' }}', {{ 'true' if ns_child.has else 'false' }})">✎</button>
                                 <button class="l-btn red"
                                     onclick="deleteThread('{{ item.info.thread_id }}', '{{ item.info.thread_name }}')">×</button>
                             </div>
-                        </div>
-
-                        {% set last_week = item.weeks[-1] %}
-                        {% for day in last_week %}
-                        {% set current_col = 2 + loop.index0 %}
-                        <div class="habit-cell {% if day.status == 'hit' %}completed{% endif %} {% if day.is_today %}is-today{% endif %} {% if not is_last_week %}past-week{% endif %} {% if day.is_padding %}padding{% endif %}"
-                            style="grid-column: {{ current_col }};" data-id="{{ item.info.thread_id }}"
-                            data-date="{{ day.date }}" data-rank="{{ item.info.rank }}" data-status="{{ day.status }}"
-                            data-week="{{ item.weeks|length - 1 }}" data-idx="{{ ns_sort.idx }}" data-cat="{{ cat }}" {%
-                            if day.miss_reason %}data-reason="{{ day.miss_reason }}" {% endif %}
-                            onclick="handleCellClick(this)" oncontextmenu="handleRightClick(event, this)">
-                        </div>
-                        {% endfor %}
-                        {% endfor %}
-                        {% endfor %}
                     </div>
-                </div>
-                <div id="calendarView" class="grid-wrapper" style="display: none;">
-                    <div class="cal-container" style="padding: 0 20px 20px 20px;">
-                        <div class="cal-header"
-                            style="padding-top: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                            <div style="display: flex; align-items: baseline; gap: 10px;">
-                                <button class="cal-nav-btn" onclick="calNavigate(-1)">←</button>
-                                <span class="cal-month-title" id="calMonthTitle"></span>
-                                <span class="cal-year-title" id="calYearTitle"></span>
-                                <button class="cal-nav-btn" onclick="calNavigate(1)">→</button>
-                                <button class="cal-today-btn" id="calTodayBtn" onclick="calGoToday()"
-                                    style="display: none;">today</button>
-                                <span class="cal-logged-count" id="calLoggedCount">0/0 logged</span>
-                            </div>
 
-                            <div class="toggle-group" style="margin: 0;">
-                                <button class="tgl-btn active" id="btnCalIntentionality"
-                                    onclick="switchCalendar('intentionality')">Intentionality</button>
-                                <button class="tgl-btn" id="btnCalResilience"
-                                    onclick="switchCalendar('resilience')">Resilience</button>
-                            </div>
-                        </div>
+                    {% for week in item.weeks %}
+                    {% set w_idx = loop.index0 %}
+                    {% set is_last_week = loop.last %}
+                    {% for day in week %}
+                    {% set d_idx = loop.index0 %}
+                    {% set current_col = 2 + (w_idx * 8) + d_idx %}
 
-                        <div class="cal-legend" id="calLegendContainer" style="margin-top: 10px;"></div>
-                        <div class="cal-stats-bar" id="calStatsBar" style="margin: 15px 0;"></div>
-                        <div class="cal-dow-grid" id="calDowGrid"></div>
-                        <div class="cal-calendar-grid" id="calGrid"></div>
+                    <div class="habit-cell {% if day.status == 'hit' %}completed{% endif %} {% if day.is_today %}is-today{% endif %} {% if not is_last_week %}past-week{% endif %} {% if day.is_padding %}padding{% endif %} {% if is_sub %}derivative-cell{% endif %}"
+                        style="grid-column: {{ current_col }};" data-id="{{ item.info.thread_id }}"
+                        data-date="{{ day.date }}" data-rank="{{ item.info.rank }}" data-status="{{ day.status }}"
+                        data-week="{{ w_idx }}" data-idx="{{ ns_sort.idx }}" data-cat="{{ cat }}" {% if day.miss_reason
+                        %}data-reason="{{ day.miss_reason }}" {% endif %} onclick="handleCellClick(this)"
+                        oncontextmenu="handleRightClick(event, this)">
                     </div>
+                    {% endfor %}
+                    {% endfor %}
+                    {% endfor %}
+                    {% endfor %}
+
                 </div>
+            </div>
 
-                <div class="cal-modal-overlay" id="calModalOverlay" onclick="calCloseEditor(event)">
-                    <div class="cal-modal-content" onclick="event.stopPropagation()">
-                        <div class="cal-modal-header">
-                            <span class="cal-modal-title" id="calModalTitle"></span>
-                            <button class="cal-close-btn" onclick="calCloseEditor(event)">×</button>
-                        </div>
+            <div class="grid-wrapper mobile-only">
+                <div class="grid-container" style="grid-template-columns: max-content repeat(7, 14px); row-gap: 2px;">
+                    {% if week_headers %}
+                    {% set last_header = week_headers[-1] %}
+                    <div class="week-band" style="grid-column: 2 / span 7;">
+                        <span class="week-band-label" onclick="openWeekContextModal('{{ last_header.id }}')">
+                            {{ last_header.label }}
+                        </span>
+                        <span class="week-band-line"></span>
+                    </div>
 
-                        <div id="calSimpleFormContainer" style="text-align: left; margin-bottom: 20px;">
-                            <div class="cal-horizon-selector" id="calHorizonSelector" style="margin-bottom: 16px;">
-                            </div>
+                    {% set days_letters = ['M','T','W','T','F','S','S'] %}
+                    {% set last_week_days = grouped_threads[categories[0]][0].weeks[-1] %}
+                    {% for day in last_week_days %}
+                    {% set col = 2 + loop.index0 %}
+                    <div class="day-date" style="grid-column: {{ col }};"
+                        onclick="openContextModalForDate('{{ day.date }}')">{{ day.date.split('-')[-1] }}</div>
 
-                            <label class="m-label">Header</label>
-                            <input type="text" id="calEditHeader" class="m-input" placeholder="Visible in calendar...">
+                    <div class="day-letter" style="grid-column: {{ col }};">
+                        {{ days_letters[loop.index0] }}
+                        {% if day.is_off_routine %}
+                        <span class="off-routine-cross">×</span>
+                        {% endif %}
+                    </div>
 
-                            <label class="m-label" style="margin-top: 12px;">Notes</label>
-                            <textarea id="calEditNotes" class="m-input"
-                                placeholder="Add your thoughts or details here..."
-                                style="min-height: 150px; resize: vertical;"></textarea>
-                            <div id="calPlanContainer" style="margin-top: 15px;">
-                                <label
-                                    style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:500; color:#555;">
-                                    <input type="checkbox" id="calEditPlan"> 🗓️ Plan
+                    {% endfor %}
+
+                    {% endif %}
+
+                    {% set ns_sort = namespace(idx=0) %}
+                    {% for cat in categories %}
+                    <div class="category-header type-header" data-cat="{{ cat }}">
+                        <span>{{ cat|upper }}</span>
+                        {% if is_auth %}
+                        <button class="cat-add-btn" onclick="openAddModal('{{ cat }}')">＋</button>
+                        {% endif %}
+                    </div>
+
+                    {% for item in grouped_threads[cat] %}
+                    {% set ns_sort.idx = ns_sort.idx + 1 %}
+                    {% set is_sub = item.info.parent_id is not none %}
+
+                    {% set ns_child = namespace(has=false) %}
+                    {% for c_item in grouped_threads[cat] %}
+                    {% if c_item.info.parent_id == item.info.thread_id %}
+                    {% set ns_child.has = true %}
+                    {% endif %}
+                    {% endfor %}
+
+                    <div class="habit-label {% if is_sub %}is-derivative{% endif %}" data-idx="{{ ns_sort.idx }}"
+                        data-cat="{{ cat }}" data-rank="{{ item.info.rank }}">
+
+                        <div class="quick-edit-panel qe-panel" data-id="{{ item.info.thread_id }}"
+                            data-name="{{ item.info.thread_name }}"
+                            data-redacted="{{ item.info.thread_name_redacted or '' }}"
+                            data-subcat="{{ item.info.sub_category or '' }}" data-type="{{ item.info.type }}"
+                            data-time="{{ item.info.time_of_day or 'unspecified' }}">
+
+                            <select class="qe-parent" autocomplete="off" onchange="quickEditSave('{{ item.info.thread_id }}', 'parent')" {% if ns_child.has %}disabled title="Impossible, as it already has derivative habits"{% endif %}>
+                                <option value="">No Parent</option>
+                                {% for p_item in grouped_threads[cat] %}
+                                {% if not p_item.info.parent_id and p_item.info.thread_id != item.info.thread_id %}
+                                <option value="{{ p_item.info.thread_id }}" {% if
+                                    item.info.parent_id==p_item.info.thread_id %}selected{% endif %}>
+                                    {{ p_item.info.thread_name }}
+                                </option>
+                                {% endif %}
+                                {% endfor %}
+                            </select>
+
+                            <div class="qe-cadence">
+                                {% set c_str = item.info.cadence|string %}
+                                {% set is_d = (c_str == 'daily') %}
+
+                                {% for d_val, d_lbl in [('0','M'), ('1','T'), ('2','W'), ('3','T'), ('4','F'),
+                                ('5','S'), ('6','S')] %}
+                                <label class="qe-day-tgl">
+                                    <input type="checkbox" value="{{ d_val }}" {% if is_d or d_val in c_str %}checked{%
+                                        endif %} onchange="quickEditSave('{{ item.info.thread_id }}', 'cadence')">
+                                    <span class="qe-day-box">{{ d_lbl }}</span>
                                 </label>
+                                {% endfor %}
                             </div>
                         </div>
 
-                        <div class="cal-modal-footer">
-                            <button class="modal-btn black" onclick="calSaveDay()" style="width: 100%;">Save</button>
+                        <span class="habit-name">
+                            {% if item.info.parent_id is not none %}
+                            <span class="branch-icon">└──</span>
+                            {% endif %}
+                            {{ item.info.thread_name }}
+                        </span>
+                        <div class="label-controls">
+                            <button class="l-btn" onclick="moveThread('{{ item.info.thread_id }}', 'up')">↑</button>
+                            <button class="l-btn" onclick="moveThread('{{ item.info.thread_id }}', 'down')">↓</button>
+                            <button class="l-btn"
+                                onclick="openEditModal('{{ item.info.thread_id }}', '{{ item.info.thread_name }}', '{{ item.info.thread_name_redacted or '' }}', '{{ item.info.sub_category or '' }}', '{{ item.info.type }}', '{{ item.info.cadence }}', '{{ item.info.time_of_day or 'unspecified' }}', '{{ item.info.parent_id or '' }}', {{ 'true' if ns_child.has else 'false' }})">✎</button>
+                            <button class="l-btn red"
+                                onclick="deleteThread('{{ item.info.thread_id }}', '{{ item.info.thread_name }}')">×</button>
                         </div>
                     </div>
+
+                    {% set last_week = item.weeks[-1] %}
+                    {% for day in last_week %}
+                    {% set current_col = 2 + loop.index0 %}
+                    <div class="habit-cell {% if day.status == 'hit' %}completed{% endif %} {% if day.is_today %}is-today{% endif %} {% if day.is_padding %}padding{% endif %} {% if is_sub %}derivative-cell{% endif %}"
+                        style="grid-column: {{ current_col }};" data-id="{{ item.info.thread_id }}"
+                        data-date="{{ day.date }}" data-rank="{{ item.info.rank }}" data-status="{{ day.status }}"
+                        data-week="{{ item.weeks|length - 1 }}" data-idx="{{ ns_sort.idx }}" data-cat="{{ cat }}" {% if
+                        day.miss_reason %}data-reason="{{ day.miss_reason }}" {% endif %}
+                        onclick="handleCellClick(this)" oncontextmenu="handleRightClick(event, this)">
+                    </div>
+                    {% endfor %}
+                    {% endfor %}
+                    {% endfor %}
                 </div>
+            </div>
+            <div id="calendarView" class="grid-wrapper" style="display: none;">
+                <div class="cal-container" style="padding: 0 20px 20px 20px;">
+                    <div class="cal-header"
+                        style="padding-top: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                        <div style="display: flex; align-items: baseline; gap: 10px;">
+                            <button class="cal-nav-btn" onclick="calNavigate(-1)">←</button>
+                            <span class="cal-month-title" id="calMonthTitle"></span>
+                            <span class="cal-year-title" id="calYearTitle"></span>
+                            <button class="cal-nav-btn" onclick="calNavigate(1)">→</button>
+                            <button class="cal-today-btn" id="calTodayBtn" onclick="calGoToday()"
+                                style="display: none;">today</button>
+                            <span class="cal-logged-count" id="calLoggedCount">0/0 logged</span>
+                        </div>
 
-                <div id="aggregateView" class="grid-wrapper"
-                    style="display: none; padding: 20px 30px; background: #fff;">
-                    <div id="aggregateContainer"></div>
+                        <div class="toggle-group" style="margin: 0;">
+                            <button class="tgl-btn active" id="btnCalIntentionality"
+                                onclick="switchCalendar('intentionality')">Intentionality</button>
+                            <button class="tgl-btn" id="btnCalResilience"
+                                onclick="switchCalendar('resilience')">Resilience</button>
+                        </div>
+                    </div>
+
+                    <div class="cal-legend" id="calLegendContainer" style="margin-top: 10px;"></div>
+                    <div class="cal-stats-bar" id="calStatsBar" style="margin: 15px 0;"></div>
+                    <div class="cal-dow-grid" id="calDowGrid"></div>
+                    <div class="cal-calendar-grid" id="calGrid"></div>
                 </div>
+            </div>
 
-                <script>
-                    const CAL_HORIZONS = [
-                        { id: "survival", label: "Survival", short: "Now", color: "#888" },
-                        { id: "2wk", label: "2 wk", short: "2 wk", color: "#7dd3fc" },
-                        { id: "1yr", label: "1 yr", short: "1 yr", color: "#3b82f6" },
-                        { id: "5yr", label: "5 yr", short: "5 yr", color: "#d946ef" },
-                        { id: "10yr", label: "10+ yr", short: "10+", color: "#f59e0b" }
-                    ];
+            <div class="cal-modal-overlay" id="calModalOverlay" onclick="calCloseEditor(event)">
+                <div class="cal-modal-content" onclick="event.stopPropagation()">
+                    <div class="cal-modal-header">
+                        <span class="cal-modal-title" id="calModalTitle"></span>
+                        <button class="cal-close-btn" onclick="calCloseEditor(event)">×</button>
+                    </div>
 
-                    const RESILIENCE_STATUSES = [
-                        { id: "baseline", label: "Baseline", color: "#fafafa" },
-                        { id: "not_okay", label: "Not Okay", color: "#e0e0e0" },
-                        { id: "okay", label: "Okay", color: "#81d4fa" }
-                    ];
+                    <div id="calSimpleFormContainer" style="text-align: left; margin-bottom: 20px;">
+                        <div class="cal-horizon-selector" id="calHorizonSelector" style="margin-bottom: 16px;">
+                        </div>
 
-                    const CAL_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-                    const CAL_FULL_DOW = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-                    const CAL_DOW = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+                        <label class="m-label">Header</label>
+                        <input type="text" id="calEditHeader" class="m-input" placeholder="Visible in calendar...">
 
-                    const chicagoTimeStr = new Date().toLocaleString("en-US", { timeZone: "America/Chicago" });
-                    const calToday = new Date(chicagoTimeStr);
-                    let calViewYear = calToday.getFullYear();
-                    let calViewMonth = calToday.getMonth();
-                    let calDataMap = {};
-                    let calEditDay = null;
-                    let calCurrentHorizon = "survival";
-                    let calCurrentStatus = "baseline";
-                    let currentCalMode = "intentionality";
-                    window.calDataLoaded = false;
+                        <label class="m-label" style="margin-top: 12px;">Notes</label>
+                        <textarea id="calEditNotes" class="m-input" placeholder="Add your thoughts or details here..."
+                            style="min-height: 150px; resize: vertical;"></textarea>
+                        <div id="calPlanContainer" style="margin-top: 15px;">
+                            <label
+                                style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:500; color:#555;">
+                                <input type="checkbox" id="calEditPlan"> 🗓️ Plan
+                            </label>
+                        </div>
+                    </div>
 
-                    function switchCalendar(mode) {
-                        currentCalMode = mode;
-                        document.getElementById('btnCalIntentionality').classList.toggle('active', mode === 'intentionality');
-                        document.getElementById('btnCalResilience').classList.toggle('active', mode === 'resilience');
-                        loadCalData();
+                    <div class="cal-modal-footer">
+                        <button class="modal-btn black" onclick="calSaveDay()" style="width: 100%;">Save</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="aggregateView" class="grid-wrapper" style="display: none; padding: 20px 30px; background: #fff;">
+                <div id="aggregateContainer"></div>
+            </div>
+
+            <script>
+                const CAL_HORIZONS = [
+                    { id: "survival", label: "Survival", short: "Now", color: "#888" },
+                    { id: "2wk", label: "2 wk", short: "2 wk", color: "#7dd3fc" },
+                    { id: "1yr", label: "1 yr", short: "1 yr", color: "#3b82f6" },
+                    { id: "5yr", label: "5 yr", short: "5 yr", color: "#d946ef" },
+                    { id: "10yr", label: "10+ yr", short: "10+", color: "#f59e0b" }
+                ];
+
+                const RESILIENCE_STATUSES = [
+                    { id: "baseline", label: "Baseline", color: "#fafafa" },
+                    { id: "not_okay", label: "Not Okay", color: "#e0e0e0" },
+                    { id: "okay", label: "Okay", color: "#81d4fa" }
+                ];
+
+                const CAL_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+                const CAL_FULL_DOW = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+                const CAL_DOW = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+
+                const chicagoTimeStr = new Date().toLocaleString("en-US", { timeZone: "America/Chicago" });
+                const calToday = new Date(chicagoTimeStr);
+                let calViewYear = calToday.getFullYear();
+                let calViewMonth = calToday.getMonth();
+                let calDataMap = {};
+                let calEditDay = null;
+                let calCurrentHorizon = "survival";
+                let calCurrentStatus = "baseline";
+                let currentCalMode = "intentionality";
+                window.calDataLoaded = false;
+
+                function switchCalendar(mode) {
+                    currentCalMode = mode;
+                    document.getElementById('btnCalIntentionality').classList.toggle('active', mode === 'intentionality');
+                    document.getElementById('btnCalResilience').classList.toggle('active', mode === 'resilience');
+                    loadCalData();
+                }
+
+                function calGetDaysInMonth(year, month) { return new Date(year, month + 1, 0).getDate(); }
+                function calGetFirstDayOfWeek(year, month) {
+                    let d = new Date(year, month, 1).getDay();
+                    return d === 0 ? 6 : d - 1;
+                }
+
+                async function loadCalData() {
+                    if (!IS_AUTH) return;
+                    try {
+                        const response = await fetch(`/api/calendar/${currentCalMode}/${calViewYear}/${calViewMonth}?t=${new Date().getTime()}`);
+                        calDataMap = response.ok ? await response.json() : {};
+                    } catch (e) { calDataMap = {}; }
+                    renderCalAll();
+                }
+
+                function renderHorizonSelector() {
+                    const container = document.getElementById('calHorizonSelector');
+                    if (!container) return;
+
+                    if (currentCalMode === 'intentionality') {
+                        container.innerHTML = CAL_HORIZONS.map(h => {
+                            const isActive = calCurrentHorizon === h.id;
+                            const style = isActive
+                                ? `background: ${h.color}; border: 2px solid #fff; outline: 2px solid ${h.color}; outline-offset: 1px;`
+                                : `background: #f0f0f0; border: 1.5px solid #ddd; outline: none;`;
+                            return `<button type="button" class="cal-h-btn" style="${style}" onclick="calSetHorizon('${h.id}')" title="${h.label}"></button>`;
+                        }).join('');
+                    } else {
+                        container.innerHTML = RESILIENCE_STATUSES.map(s => {
+                            const isActive = calCurrentStatus === s.id;
+                            const outlineColor = s.color === '#fafafa' ? '#ccc' : s.color;
+                            const style = isActive
+                                ? `background: ${s.color}; border: 2px solid #fff; outline: 2px solid ${outlineColor}; outline-offset: 1px;`
+                                : `background: ${s.color}; border: 1.5px solid #ddd; outline: none;`;
+                            return `<button type="button" class="cal-h-btn" style="${style}" onclick="calSetStatus('${s.id}')" title="${s.label}"></button>`;
+                        }).join('');
                     }
+                }
 
-                    function calGetDaysInMonth(year, month) { return new Date(year, month + 1, 0).getDate(); }
-                    function calGetFirstDayOfWeek(year, month) {
-                        let d = new Date(year, month, 1).getDay();
-                        return d === 0 ? 6 : d - 1;
+                function calSetHorizon(hId) { calCurrentHorizon = hId; renderHorizonSelector(); }
+                function calSetStatus(sId) { calCurrentStatus = sId; renderHorizonSelector(); }
+
+                async function calSaveDay() {
+                    const headerVal = document.getElementById('calEditHeader').value.trim();
+                    const notesVal = document.getElementById('calEditNotes').value.trim();
+                    const planVal = document.getElementById('calEditPlan').checked;
+
+                    const dateStr = `${calViewYear}-${String(calViewMonth + 1).padStart(2, '0')}-${String(calEditDay).padStart(2, '0')}`;
+                    try {
+                        const response = await fetch(`/api/calendar/${currentCalMode}/save`, {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                date: dateStr, header: headerVal, notes: notesVal,
+                                horizon: calCurrentHorizon, plan: planVal, status: calCurrentStatus
+                            })
+                        });
+                        if (response.ok) {
+                            if (!headerVal && !notesVal) delete calDataMap[calEditDay];
+                            else calDataMap[calEditDay] = { header: headerVal, notes: notesVal, horizon: calCurrentHorizon, plan: planVal, status: calCurrentStatus };
+                            renderCalAll();
+                            calCloseEditor();
+                        } else alert("Error saving");
+                    } catch (e) { console.error("Error:", e); }
+                }
+
+                function calNavigate(dir) {
+                    calViewMonth += dir;
+                    if (calViewMonth < 0) { calViewMonth = 11; calViewYear--; }
+                    if (calViewMonth > 11) { calViewMonth = 0; calViewYear++; }
+                    loadCalData();
+                }
+
+                function calGoToday() {
+                    calViewYear = calToday.getFullYear(); calViewMonth = calToday.getMonth();
+                    loadCalData();
+                }
+
+                function renderCalAll() {
+                    const isCurrentMonth = calViewYear === calToday.getFullYear() && calViewMonth === calToday.getMonth();
+                    const daysInMonth = calGetDaysInMonth(calViewYear, calViewMonth);
+                    const loggedCount = Object.keys(calDataMap).length;
+
+                    document.getElementById('calMonthTitle').innerText = CAL_MONTHS[calViewMonth];
+                    document.getElementById('calYearTitle').innerText = calViewYear;
+                    document.getElementById('calTodayBtn').style.display = isCurrentMonth ? 'none' : 'inline-block';
+                    document.getElementById('calLoggedCount').innerText = `${loggedCount}/${daysInMonth} logged`;
+
+                    document.getElementById('calDowGrid').innerHTML = CAL_DOW.map(d => `<div class="cal-dow-item">${d}</div>`).join('');
+                    const legendContainer = document.getElementById('calLegendContainer');
+                    const statsBar = document.getElementById('calStatsBar');
+
+                    legendContainer.style.display = 'flex';
+                    statsBar.style.display = 'flex';
+
+                    const activePalette = currentCalMode === 'intentionality' ? CAL_HORIZONS : RESILIENCE_STATUSES;
+                    let legendHtml = '';
+                    activePalette.forEach(item => {
+                        const outline = item.color === '#fafafa' ? 'border: 1px solid #ccc;' : '';
+                        legendHtml += `<div class="cal-legend-item"><div class="cal-dot" style="background: ${item.color}; box-sizing: border-box; ${outline}"></div>${item.label}</div>`;
+                    });
+                    if (currentCalMode === 'intentionality') {
+                        legendHtml += `<div class="cal-legend-item"><div class="cal-dot" style="background: #fafafa; border: 1px dashed #999; box-sizing: border-box;"></div>Plan</div>`;
                     }
+                    legendContainer.innerHTML = legendHtml;
 
-                    async function loadCalData() {
-                        if (!IS_AUTH) return;
-                        try {
-                            const response = await fetch(`/api/calendar/${currentCalMode}/${calViewYear}/${calViewMonth}?t=${new Date().getTime()}`);
-                            calDataMap = response.ok ? await response.json() : {};
-                        } catch (e) { calDataMap = {}; }
-                        renderCalAll();
-                    }
+                    let segments = [];
+                    let currentSegment = null;
 
-                    function renderHorizonSelector() {
-                        const container = document.getElementById('calHorizonSelector');
-                        if (!container) return;
+                    for (let day = 1; day <= daysInMonth; day++) {
+                        const dayData = calDataMap[day];
+                        let color = 'transparent';
+                        let title = '';
 
-                        if (currentCalMode === 'intentionality') {
-                            container.innerHTML = CAL_HORIZONS.map(h => {
-                                const isActive = calCurrentHorizon === h.id;
-                                const style = isActive
-                                    ? `background: ${h.color}; border: 2px solid #fff; outline: 2px solid ${h.color}; outline-offset: 1px;`
-                                    : `background: #f0f0f0; border: 1.5px solid #ddd; outline: none;`;
-                                return `<button type="button" class="cal-h-btn" style="${style}" onclick="calSetHorizon('${h.id}')" title="${h.label}"></button>`;
-                            }).join('');
+                        if (dayData && (dayData.header || dayData.notes)) {
+                            if (currentCalMode === 'intentionality') {
+                                if (dayData.plan) {
+                                    color = '#fafafa';
+                                    title = 'Plan';
+                                } else {
+                                    const hObj = CAL_HORIZONS.find(h => h.id === (dayData.horizon || 'survival'));
+                                    if (hObj) {
+                                        color = hObj.color;
+                                        title = hObj.label;
+                                    }
+                                }
+                            } else if (currentCalMode === 'resilience') {
+                                const sObj = RESILIENCE_STATUSES.find(s => s.id === (dayData.status || 'baseline'));
+                                if (sObj) {
+                                    color = sObj.color;
+                                    title = sObj.label;
+                                }
+                            }
+                        }
+
+                        if (currentSegment && currentSegment.color === color) {
+                            currentSegment.length += 1;
                         } else {
-                            container.innerHTML = RESILIENCE_STATUSES.map(s => {
-                                const isActive = calCurrentStatus === s.id;
-                                const outlineColor = s.color === '#fafafa' ? '#ccc' : s.color;
-                                const style = isActive
-                                    ? `background: ${s.color}; border: 2px solid #fff; outline: 2px solid ${outlineColor}; outline-offset: 1px;`
-                                    : `background: ${s.color}; border: 1.5px solid #ddd; outline: none;`;
-                                return `<button type="button" class="cal-h-btn" style="${style}" onclick="calSetStatus('${s.id}')" title="${s.label}"></button>`;
-                            }).join('');
+                            if (currentSegment) segments.push(currentSegment);
+                            currentSegment = { color, title, length: 1 };
                         }
                     }
+                    if (currentSegment) segments.push(currentSegment);
 
-                    function calSetHorizon(hId) { calCurrentHorizon = hId; renderHorizonSelector(); }
-                    function calSetStatus(sId) { calCurrentStatus = sId; renderHorizonSelector(); }
+                    let statsHtml = '';
+                    segments.forEach(seg => {
+                        const pct = (seg.length / daysInMonth) * 100;
+                        const borderFix = seg.color === '#fafafa' ? 'border-top: 1px solid #ebebeb; border-bottom: 1px solid #ebebeb; box-sizing: border-box;' : '';
+                        const titleAttr = seg.title ? `title="${seg.title} (${seg.length} days)"` : '';
 
-                    async function calSaveDay() {
-                        const headerVal = document.getElementById('calEditHeader').value.trim();
-                        const notesVal = document.getElementById('calEditNotes').value.trim();
-                        const planVal = document.getElementById('calEditPlan').checked;
+                        statsHtml += `<div class="cal-stats-segment" style="width: ${pct}%; background: ${seg.color}; ${borderFix}" ${titleAttr}></div>`;
+                    });
+                    statsBar.innerHTML = statsHtml;
 
-                        const dateStr = `${calViewYear}-${String(calViewMonth + 1).padStart(2, '0')}-${String(calEditDay).padStart(2, '0')}`;
-                        try {
-                            const response = await fetch(`/api/calendar/${currentCalMode}/save`, {
-                                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    date: dateStr, header: headerVal, notes: notesVal,
-                                    horizon: calCurrentHorizon, plan: planVal, status: calCurrentStatus
-                                })
-                            });
-                            if (response.ok) {
-                                if (!headerVal && !notesVal) delete calDataMap[calEditDay];
-                                else calDataMap[calEditDay] = { header: headerVal, notes: notesVal, horizon: calCurrentHorizon, plan: planVal, status: calCurrentStatus };
-                                renderCalAll();
-                                calCloseEditor();
-                            } else alert("Error saving");
-                        } catch (e) { console.error("Error:", e); }
-                    }
+                    const grid = document.getElementById('calGrid');
+                    grid.innerHTML = '';
+                    const firstDow = calGetFirstDayOfWeek(calViewYear, calViewMonth);
 
-                    function calNavigate(dir) {
-                        calViewMonth += dir;
-                        if (calViewMonth < 0) { calViewMonth = 11; calViewYear--; }
-                        if (calViewMonth > 11) { calViewMonth = 0; calViewYear++; }
-                        loadCalData();
-                    }
+                    for (let i = 0; i < firstDow; i++) grid.appendChild(document.createElement('div'));
 
-                    function calGoToday() {
-                        calViewYear = calToday.getFullYear(); calViewMonth = calToday.getMonth();
-                        loadCalData();
-                    }
+                    for (let day = 1; day <= daysInMonth; day++) {
+                        const isToday = isCurrentMonth && day === calToday.getDate();
+                        const isFuture = isCurrentMonth && day > calToday.getDate();
+                        const dayData = calDataMap[day];
 
-                    function renderCalAll() {
-                        const isCurrentMonth = calViewYear === calToday.getFullYear() && calViewMonth === calToday.getMonth();
-                        const daysInMonth = calGetDaysInMonth(calViewYear, calViewMonth);
-                        const loggedCount = Object.keys(calDataMap).length;
+                        let cell = document.createElement('div');
+                        let className = `cal-day-cell ${isToday ? 'is-today' : ''} ${isFuture ? 'is-future' : ''}`;
+                        let textStyles = '';
 
-                        document.getElementById('calMonthTitle').innerText = CAL_MONTHS[calViewMonth];
-                        document.getElementById('calYearTitle').innerText = calViewYear;
-                        document.getElementById('calTodayBtn').style.display = isCurrentMonth ? 'none' : 'inline-block';
-                        document.getElementById('calLoggedCount').innerText = `${loggedCount}/${daysInMonth} logged`;
-
-                        document.getElementById('calDowGrid').innerHTML = CAL_DOW.map(d => `<div class="cal-dow-item">${d}</div>`).join('');
-                        const legendContainer = document.getElementById('calLegendContainer');
-                        const statsBar = document.getElementById('calStatsBar');
-
-                        legendContainer.style.display = 'flex';
-                        statsBar.style.display = 'flex';
-
-                        const activePalette = currentCalMode === 'intentionality' ? CAL_HORIZONS : RESILIENCE_STATUSES;
-                        let legendHtml = '';
-                        activePalette.forEach(item => {
-                            const outline = item.color === '#fafafa' ? 'border: 1px solid #ccc;' : '';
-                            legendHtml += `<div class="cal-legend-item"><div class="cal-dot" style="background: ${item.color}; box-sizing: border-box; ${outline}"></div>${item.label}</div>`;
-                        });
-                        if (currentCalMode === 'intentionality') {
-                            legendHtml += `<div class="cal-legend-item"><div class="cal-dot" style="background: #fafafa; border: 1px dashed #999; box-sizing: border-box;"></div>Plan</div>`;
-                        }
-                        legendContainer.innerHTML = legendHtml;
-
-                        let segments = [];
-                        let currentSegment = null;
-
-                        for (let day = 1; day <= daysInMonth; day++) {
-                            const dayData = calDataMap[day];
-                            let color = 'transparent';
-                            let title = '';
-
-                            if (dayData && (dayData.header || dayData.notes)) {
-                                if (currentCalMode === 'intentionality') {
-                                    if (dayData.plan) {
-                                        color = '#fafafa';
-                                        title = 'Plan';
-                                    } else {
-                                        const hObj = CAL_HORIZONS.find(h => h.id === (dayData.horizon || 'survival'));
-                                        if (hObj) {
-                                            color = hObj.color;
-                                            title = hObj.label;
-                                        }
-                                    }
-                                } else if (currentCalMode === 'resilience') {
-                                    const sObj = RESILIENCE_STATUSES.find(s => s.id === (dayData.status || 'baseline'));
-                                    if (sObj) {
-                                        color = sObj.color;
-                                        title = sObj.label;
+                        if (dayData && (dayData.header || dayData.notes)) {
+                            if (currentCalMode === 'intentionality') {
+                                if (dayData.plan) {
+                                    cell.style.background = '#fafafa';
+                                    cell.style.borderColor = '#ebebeb';
+                                    textStyles = 'color: #111; font-style: italic;';
+                                } else {
+                                    const hObj = CAL_HORIZONS.find(h => h.id === (dayData.horizon || 'survival'));
+                                    if (hObj) {
+                                        cell.style.background = hObj.color;
+                                        cell.style.borderColor = hObj.color;
+                                        className += ' colored-cell';
                                     }
                                 }
-                            }
-
-                            if (currentSegment && currentSegment.color === color) {
-                                currentSegment.length += 1;
-                            } else {
-                                if (currentSegment) segments.push(currentSegment);
-                                currentSegment = { color, title, length: 1 };
-                            }
-                        }
-                        if (currentSegment) segments.push(currentSegment);
-
-                        let statsHtml = '';
-                        segments.forEach(seg => {
-                            const pct = (seg.length / daysInMonth) * 100;
-                            const borderFix = seg.color === '#fafafa' ? 'border-top: 1px solid #ebebeb; border-bottom: 1px solid #ebebeb; box-sizing: border-box;' : '';
-                            const titleAttr = seg.title ? `title="${seg.title} (${seg.length} days)"` : '';
-
-                            statsHtml += `<div class="cal-stats-segment" style="width: ${pct}%; background: ${seg.color}; ${borderFix}" ${titleAttr}></div>`;
-                        });
-                        statsBar.innerHTML = statsHtml;
-
-                        const grid = document.getElementById('calGrid');
-                        grid.innerHTML = '';
-                        const firstDow = calGetFirstDayOfWeek(calViewYear, calViewMonth);
-
-                        for (let i = 0; i < firstDow; i++) grid.appendChild(document.createElement('div'));
-
-                        for (let day = 1; day <= daysInMonth; day++) {
-                            const isToday = isCurrentMonth && day === calToday.getDate();
-                            const isFuture = isCurrentMonth && day > calToday.getDate();
-                            const dayData = calDataMap[day];
-
-                            let cell = document.createElement('div');
-                            let className = `cal-day-cell ${isToday ? 'is-today' : ''} ${isFuture ? 'is-future' : ''}`;
-                            let textStyles = '';
-
-                            if (dayData && (dayData.header || dayData.notes)) {
-                                if (currentCalMode === 'intentionality') {
-                                    if (dayData.plan) {
-                                        cell.style.background = '#fafafa';
-                                        cell.style.borderColor = '#ebebeb';
-                                        textStyles = 'color: #111; font-style: italic;';
-                                    } else {
-                                        const hObj = CAL_HORIZONS.find(h => h.id === (dayData.horizon || 'survival'));
-                                        if (hObj) {
-                                            cell.style.background = hObj.color;
-                                            cell.style.borderColor = hObj.color;
-                                            className += ' colored-cell';
-                                        }
-                                    }
-                                } else if (currentCalMode === 'resilience') {
-                                    const sObj = RESILIENCE_STATUSES.find(s => s.id === (dayData.status || 'baseline'));
-                                    if (sObj) {
-                                        cell.style.background = sObj.color;
-                                        cell.style.borderColor = sObj.id === 'baseline' ? '#ebebeb' : sObj.color;
-                                        textStyles = 'color: #1a1a1a; font-weight: 500;';
-                                    }
+                            } else if (currentCalMode === 'resilience') {
+                                const sObj = RESILIENCE_STATUSES.find(s => s.id === (dayData.status || 'baseline'));
+                                if (sObj) {
+                                    cell.style.background = sObj.color;
+                                    cell.style.borderColor = sObj.id === 'baseline' ? '#ebebeb' : sObj.color;
+                                    textStyles = 'color: #1a1a1a; font-weight: 500;';
                                 }
                             }
+                        }
 
-                            cell.className = className;
-                            cell.onclick = () => calOpenEditor(day);
+                        cell.className = className;
+                        cell.onclick = () => calOpenEditor(day);
 
-                            let previewText = dayData ? dayData.header : "";
-                            let textHtml = previewText ? `<div class="cal-day-preview" style="${textStyles}">${previewText}</div>` : '';
+                        let previewText = dayData ? dayData.header : "";
+                        let textHtml = previewText ? `<div class="cal-day-preview" style="${textStyles}">${previewText}</div>` : '';
 
-                            let numStyle = '';
-                            if (currentCalMode === 'intentionality' && dayData && !dayData.plan) {
-                                numStyle = 'color: rgba(255, 255, 255, 0.18); text-shadow: none;';
-                            }
+                        let numStyle = '';
+                        if (currentCalMode === 'intentionality' && dayData && !dayData.plan) {
+                            numStyle = 'color: rgba(255, 255, 255, 0.18); text-shadow: none;';
+                        }
 
-                            cell.innerHTML = `
+                        cell.innerHTML = `
                 <div class="cal-day-header"><span class="cal-day-number" style="${numStyle}">${day}</span></div>
                 ${textHtml}
             `;
-                            grid.appendChild(cell);
-                        }
+                        grid.appendChild(cell);
                     }
+                }
 
-                    function calOpenEditor(day) {
-                        calEditDay = day;
-                        const isFutureDay = calViewYear > calToday.getFullYear() || (calViewYear === calToday.getFullYear() && calViewMonth > calToday.getMonth()) || (calViewYear === calToday.getFullYear() && calViewMonth === calToday.getMonth() && day > calToday.getDate());
+                function calOpenEditor(day) {
+                    calEditDay = day;
+                    const isFutureDay = calViewYear > calToday.getFullYear() || (calViewYear === calToday.getFullYear() && calViewMonth > calToday.getMonth()) || (calViewYear === calToday.getFullYear() && calViewMonth === calToday.getMonth() && day > calToday.getDate());
 
-                        const existingData = calDataMap[day] || { header: "", notes: "", horizon: "survival", plan: isFutureDay, status: "baseline" };
+                    const existingData = calDataMap[day] || { header: "", notes: "", horizon: "survival", plan: isFutureDay, status: "baseline" };
 
-                        const dateObj = new Date(calViewYear, calViewMonth, calEditDay);
-                        document.getElementById('calModalTitle').innerText = `${CAL_FULL_DOW[dateObj.getDay()]}, ${CAL_MONTHS[calViewMonth]} ${calEditDay}`;
+                    const dateObj = new Date(calViewYear, calViewMonth, calEditDay);
+                    document.getElementById('calModalTitle').innerText = `${CAL_FULL_DOW[dateObj.getDay()]}, ${CAL_MONTHS[calViewMonth]} ${calEditDay}`;
 
-                        document.getElementById('calEditHeader').value = existingData.header || "";
-                        document.getElementById('calEditNotes').value = existingData.notes || "";
-                        document.getElementById('calEditPlan').checked = existingData.plan !== undefined ? existingData.plan : false;
+                    document.getElementById('calEditHeader').value = existingData.header || "";
+                    document.getElementById('calEditNotes').value = existingData.notes || "";
+                    document.getElementById('calEditPlan').checked = existingData.plan !== undefined ? existingData.plan : false;
 
-                        calCurrentHorizon = existingData.horizon || "survival";
-                        calCurrentStatus = existingData.status || "baseline";
+                    calCurrentHorizon = existingData.horizon || "survival";
+                    calCurrentStatus = existingData.status || "baseline";
 
-                        document.getElementById('calPlanContainer').style.display = currentCalMode === 'intentionality' ? 'block' : 'none';
+                    document.getElementById('calPlanContainer').style.display = currentCalMode === 'intentionality' ? 'block' : 'none';
 
-                        renderHorizonSelector();
-                        document.getElementById('calModalOverlay').style.display = 'flex';
-                    }
+                    renderHorizonSelector();
+                    document.getElementById('calModalOverlay').style.display = 'flex';
+                }
 
-                    function calCloseEditor(e) {
-                        if (e) e.stopPropagation();
-                        calEditDay = null;
-                        document.getElementById('calModalOverlay').style.display = 'none';
-                    }
+                function calCloseEditor(e) {
+                    if (e) e.stopPropagation();
+                    calEditDay = null;
+                    document.getElementById('calModalOverlay').style.display = 'none';
+                }
 
-                    function navigateWeeks(newOffset) {
-                        window.location.href = "/?offset=" + newOffset;
-                    }
+                function navigateWeeks(newOffset) {
+                    window.location.href = "/?offset=" + newOffset;
+                }
 
-                    function calAddSegment() {
-                        if (calEditSegments.length < 4) {
-                            calEditSegments.push({ horizon: "1yr", text: "" });
-                            renderCalModalSegments();
-                        }
-                    }
-
-                    function calRemoveSegment(index) {
-                        calEditSegments.splice(index, 1);
+                function calAddSegment() {
+                    if (calEditSegments.length < 4) {
+                        calEditSegments.push({ horizon: "1yr", text: "" });
                         renderCalModalSegments();
                     }
+                }
 
-                    function calUpdateSegment(index, field, value) {
-                        calEditSegments[index][field] = value;
-                        if (field === 'horizon') renderCalModalSegments();
-                        else if (field === 'text') {
-                            const charCountSpan = document.getElementById(`cal-char-count-${index}`);
-                            if (charCountSpan) {
-                                charCountSpan.innerText = `${value.length}/140`;
-                                charCountSpan.style.color = value.length > 120 ? '#d32f2f' : '#ccc';
-                            }
+                function calRemoveSegment(index) {
+                    calEditSegments.splice(index, 1);
+                    renderCalModalSegments();
+                }
+
+                function calUpdateSegment(index, field, value) {
+                    calEditSegments[index][field] = value;
+                    if (field === 'horizon') renderCalModalSegments();
+                    else if (field === 'text') {
+                        const charCountSpan = document.getElementById(`cal-char-count-${index}`);
+                        if (charCountSpan) {
+                            charCountSpan.innerText = `${value.length}/140`;
+                            charCountSpan.style.color = value.length > 120 ? '#d32f2f' : '#ccc';
                         }
                     }
+                }
 
-                    function renderCalModalSegments() {
-                        const container = document.getElementById('calSegmentsContainer');
-                        container.innerHTML = '';
-                        calEditSegments.forEach((seg, i) => {
-                            let segmentDiv = document.createElement('div');
-                            segmentDiv.className = 'cal-segment';
-                            let horizonsHtml = CAL_HORIZONS.map(h => {
-                                const isActive = seg.horizon === h.id;
-                                const style = isActive
-                                    ? `background: ${h.color}; border: 2px solid #fff; outline: 2px solid ${h.color}; outline-offset: 1px;`
-                                    : `background: #f0f0f0; border: 1.5px solid #ddd; outline: none;`;
-                                return `<button class="cal-h-btn" style="${style}" onclick="calUpdateSegment(${i}, 'horizon', '${h.id}')" title="${h.label}"></button>`;
-                            }).join('');
+                function renderCalModalSegments() {
+                    const container = document.getElementById('calSegmentsContainer');
+                    container.innerHTML = '';
+                    calEditSegments.forEach((seg, i) => {
+                        let segmentDiv = document.createElement('div');
+                        segmentDiv.className = 'cal-segment';
+                        let horizonsHtml = CAL_HORIZONS.map(h => {
+                            const isActive = seg.horizon === h.id;
+                            const style = isActive
+                                ? `background: ${h.color}; border: 2px solid #fff; outline: 2px solid ${h.color}; outline-offset: 1px;`
+                                : `background: #f0f0f0; border: 1.5px solid #ddd; outline: none;`;
+                            return `<button class="cal-h-btn" style="${style}" onclick="calUpdateSegment(${i}, 'horizon', '${h.id}')" title="${h.label}"></button>`;
+                        }).join('');
 
-                            const currentHorizonName = CAL_HORIZONS.find(h => h.id === seg.horizon)?.label || '';
-                            const charCountColor = seg.text.length > 120 ? '#d32f2f' : '#ccc';
-                            const removeBtnHtml = calEditSegments.length > 1 ? `<button class="cal-close-btn" style="margin-left: auto;" onclick="calRemoveSegment(${i})">×</button>` : '';
+                        const currentHorizonName = CAL_HORIZONS.find(h => h.id === seg.horizon)?.label || '';
+                        const charCountColor = seg.text.length > 120 ? '#d32f2f' : '#ccc';
+                        const removeBtnHtml = calEditSegments.length > 1 ? `<button class="cal-close-btn" style="margin-left: auto;" onclick="calRemoveSegment(${i})">×</button>` : '';
 
-                            segmentDiv.innerHTML = `
+                        segmentDiv.innerHTML = `
                     <div class="cal-horizon-selector">${horizonsHtml}<span class="cal-h-label">${currentHorizonName}</span>${removeBtnHtml}</div>
                     <div class="cal-textarea-wrapper">
                         <textarea class="cal-textarea" rows="3" placeholder="What was the focus of this segment? (140 chars)" 
@@ -682,40 +779,40 @@
                         <span class="cal-char-count" id="cal-char-count-${i}" style="color: ${charCountColor}">${seg.text.length}/140</span>
                     </div>
                 `;
-                            container.appendChild(segmentDiv);
-                        });
-                        document.getElementById('calAddSegmentBtn').style.visibility = calEditSegments.length < 4 ? 'visible' : 'hidden';
-                    }
-                </script>
-            </div>
+                        container.appendChild(segmentDiv);
+                    });
+                    document.getElementById('calAddSegmentBtn').style.visibility = calEditSegments.length < 4 ? 'visible' : 'hidden';
+                }
+            </script>
+        </div>
 
-            <div class="right-panel">
-                <div class="task-log-header"></div>
-                <div class="task-log" id="taskLog">
-                    {% if ctx.comment_list %}
-                    {% for msg in ctx.comment_list %}
-                    <div class="task-entry">
-                        <div class="task-text" style="padding-right: 20px; white-space: pre-wrap;">{{ msg.text }}</div>
-                        <div class="task-timestamp">{{ msg.date }} · {{ msg.time if msg.time else "--:--" }}</div>
-                        {% if is_auth %}
-                        <button class="log-delete-btn" onclick="deleteLog(this)" data-date="{{ msg.date }}"
-                            data-time="{{ msg.time }}" data-text="{{ msg.text }}" title="Delete entry">×</button>
-                        {% endif %}
-                    </div>
-                    {% endfor %}
-                    {% else %}
-                    <div style="color:#999; text-align:center; margin-top:50px; font-size: 12px;">No entries yet.</div>
+        <div class="right-panel">
+            <div class="task-log-header"></div>
+            <div class="task-log" id="taskLog">
+                {% if ctx.comment_list %}
+                {% for msg in ctx.comment_list %}
+                <div class="task-entry">
+                    <div class="task-text" style="padding-right: 20px; white-space: pre-wrap;">{{ msg.text }}</div>
+                    <div class="task-timestamp">{{ msg.date }} · {{ msg.time if msg.time else "--:--" }}</div>
+                    {% if is_auth %}
+                    <button class="log-delete-btn" onclick="deleteLog(this)" data-date="{{ msg.date }}"
+                        data-time="{{ msg.time }}" data-text="{{ msg.text }}" title="Delete entry">×</button>
                     {% endif %}
                 </div>
-
-                {% if is_auth %}
-                <div class="task-input-section">
-                    <textarea id="taskInput" class="task-input" placeholder="Log a note…"></textarea>
-                    <button class="add-task-btn" onclick="addTaskAPI()">Add Entry</button>
-                </div>
+                {% endfor %}
+                {% else %}
+                <div style="color:#999; text-align:center; margin-top:50px; font-size: 12px;">No entries yet.</div>
                 {% endif %}
             </div>
+
+            {% if is_auth %}
+            <div class="task-input-section">
+                <textarea id="taskInput" class="task-input" placeholder="Log a note…"></textarea>
+                <button class="add-task-btn" onclick="addTaskAPI()">Add Entry</button>
+            </div>
+            {% endif %}
         </div>
+    </div>
     </div>
 
     <div class="modal" id="addThreadModal">
@@ -723,6 +820,19 @@
             <div class="modal-title">New Habit: <span id="catNameDisplay"
                     style="color:#999; font-weight:normal;"></span></div>
             <div style="text-align: left; margin-bottom: 20px;">
+                <label class="m-label">Parent Habit (Optional)</label>
+                <select id="newThreadParent" class="m-input parent-habit-select">
+                    <option value="" data-cat="all">None (Main Habit)</option>
+                    {% for cat in categories %}
+                    {% for item in grouped_threads[cat] %}
+                    {% if not item.info.parent_id %}
+                    <option value="{{ item.info.thread_id }}" data-cat="{{ cat }}">
+                        {{ item.info.thread_name }}
+                    </option>
+                    {% endif %}
+                    {% endfor %}
+                    {% endfor %}
+                </select>
                 <label class="m-label">Name</label><input type="text" id="newThreadName" class="m-input">
                 <label class="m-label">Hidden Name</label><input type="text" id="newThreadRedacted" class="m-input">
                 <label class="m-label">Sub Category</label><input type="text" id="newThreadSubCat" class="m-input">
@@ -738,14 +848,21 @@
                     <option value="specific">Select Days</option>
                 </select>
                 <div id="newThreadDays"
-                    style="display: none; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; font-size: 13px;">
-                    <label><input type="checkbox" value="0"> Mon</label>
-                    <label><input type="checkbox" value="1"> Tue</label>
-                    <label><input type="checkbox" value="2"> Wed</label>
-                    <label><input type="checkbox" value="3"> Thu</label>
-                    <label><input type="checkbox" value="4"> Fri</label>
-                    <label><input type="checkbox" value="5"> Sat</label>
-                    <label><input type="checkbox" value="6"> Sun</label>
+                    style="display: none; gap: 10px; margin-bottom: 15px; flex-wrap: nowrap; justify-content: space-between;">
+                    <label class="day-toggle"><span class="day-label">M</span><input type="checkbox" value="0"><span
+                            class="day-box"></span></label>
+                    <label class="day-toggle"><span class="day-label">T</span><input type="checkbox" value="1"><span
+                            class="day-box"></span></label>
+                    <label class="day-toggle"><span class="day-label">W</span><input type="checkbox" value="2"><span
+                            class="day-box"></span></label>
+                    <label class="day-toggle"><span class="day-label">T</span><input type="checkbox" value="3"><span
+                            class="day-box"></span></label>
+                    <label class="day-toggle"><span class="day-label">F</span><input type="checkbox" value="4"><span
+                            class="day-box"></span></label>
+                    <label class="day-toggle"><span class="day-label">S</span><input type="checkbox" value="5"><span
+                            class="day-box"></span></label>
+                    <label class="day-toggle"><span class="day-label">S</span><input type="checkbox" value="6"><span
+                            class="day-box"></span></label>
                 </div>
             </div>
             <div class="modal-buttons">
@@ -759,6 +876,19 @@
         <div class="modal-content">
             <div class="modal-title">Edit Habit</div>
             <div style="text-align: left; margin-bottom: 20px;">
+                <label class="m-label">Parent Habit (Optional)</label>
+                <select id="editThreadParent" class="m-input parent-habit-select">
+                    <option value="" data-cat="all">None (Main Habit)</option>
+                    {% for cat in categories %}
+                    {% for item in grouped_threads[cat] %}
+                    {% if not item.info.parent_id %}
+                    <option value="{{ item.info.thread_id }}" data-cat="{{ cat }}">
+                        {{ item.info.thread_name }}
+                    </option>
+                    {% endif %}
+                    {% endfor %}
+                    {% endfor %}
+                </select>
                 <input type="hidden" id="editThreadId">
                 <label class="m-label">Name</label>
                 <input type="text" id="editThreadName" class="m-input">
@@ -782,14 +912,21 @@
                     <option value="specific">Select days</option>
                 </select>
                 <div id="editThreadDays"
-                    style="display: none; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; font-size: 13px;">
-                    <label><input type="checkbox" value="0"> Mon</label>
-                    <label><input type="checkbox" value="1"> Tue</label>
-                    <label><input type="checkbox" value="2"> Wed</label>
-                    <label><input type="checkbox" value="3"> Thu</label>
-                    <label><input type="checkbox" value="4"> Fri</label>
-                    <label><input type="checkbox" value="5"> Sat</label>
-                    <label><input type="checkbox" value="6"> Sun</label>
+                    style="display: none; gap: 10px; margin-bottom: 15px; flex-wrap: nowrap; justify-content: space-between;">
+                    <label class="day-toggle"><span class="day-label">M</span><input type="checkbox" value="0"><span
+                            class="day-box"></span></label>
+                    <label class="day-toggle"><span class="day-label">T</span><input type="checkbox" value="1"><span
+                            class="day-box"></span></label>
+                    <label class="day-toggle"><span class="day-label">W</span><input type="checkbox" value="2"><span
+                            class="day-box"></span></label>
+                    <label class="day-toggle"><span class="day-label">T</span><input type="checkbox" value="3"><span
+                            class="day-box"></span></label>
+                    <label class="day-toggle"><span class="day-label">F</span><input type="checkbox" value="4"><span
+                            class="day-box"></span></label>
+                    <label class="day-toggle"><span class="day-label">S</span><input type="checkbox" value="5"><span
+                            class="day-box"></span></label>
+                    <label class="day-toggle"><span class="day-label">S</span><input type="checkbox" value="6"><span
+                            class="day-box"></span></label>
                 </div>
 
                 <label class="m-label">Time of Day</label>
