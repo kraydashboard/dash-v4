@@ -346,6 +346,7 @@ def create_full_backup_json():
             "type": t.type,
             "cadence": t.cadence,
             "thread_name_redacted": t.thread_name_redacted,
+            "parent_id": t.parent_id,
         }
         for t in Thread.query.all()
     ]
@@ -376,6 +377,12 @@ def create_full_backup_json():
             "project_type_this_week": c.project_type_this_week,
             "day_meds": c.day_meds,
             "comments": c.comments,
+            "bh_hydroxizine": c.bh_hydroxizine,
+            "bh_ritalin": c.bh_ritalin,
+            "bh_modafinil": c.bh_modafinil,
+            "bh_caffeine": c.bh_caffeine,
+            "bh_alcohol": c.bh_alcohol,
+            "bh_thc": c.bh_thc,
         }
         for c in Calendar.query.all()
     ]
@@ -500,6 +507,7 @@ def restore_from_json(json_content):
                 type=t.get("type"),
                 cadence=t.get("cadence"),
                 thread_name_redacted=t.get("thread_name_redacted"),
+                parent_id=t.get("parent_id"),
             )
             db.session.add(th)
 
@@ -588,6 +596,12 @@ def restore_from_json(json_content):
                 day_meds=c.get("day_meds", False),
                 off_routine_flag=c.get("off_routine_flag", False),
                 off_routine_reason=c.get("off_routine_reason", ""),
+                bh_hydroxizine=c.get("bh_hydroxizine", False),
+                bh_ritalin=c.get("bh_ritalin", False),
+                bh_modafinil=c.get("bh_modafinil", False),
+                bh_caffeine=c.get("bh_caffeine", False),
+                bh_alcohol=c.get("bh_alcohol", False),
+                bh_thc=c.get("bh_thc", False),
             )
             db.session.add(cal)
 
@@ -1225,9 +1239,16 @@ def edit_thread():
             new_parent_id = int(p_id) if p_id else None
 
             if new_parent_id is not None and new_parent_id != thread.parent_id:
-                has_children = Thread.query.filter_by(parent_id=thread.thread_id, status='active').first()
+                has_children = Thread.query.filter_by(
+                    parent_id=thread.thread_id, status="active"
+                ).first()
                 if has_children:
-                    return jsonify({"success": False, "error": "This habit already has derivative habits, so it cannot become a derivative itself."})
+                    return jsonify(
+                        {
+                            "success": False,
+                            "error": "This habit already has derivative habits, so it cannot become a derivative itself.",
+                        }
+                    )
 
             thread.parent_id = new_parent_id
 
@@ -1251,9 +1272,9 @@ def move_thread():
         return jsonify({"success": False})
 
     query = Thread.query.filter(
-        Thread.status == "active", 
+        Thread.status == "active",
         Thread.category == thread.category,
-        Thread.parent_id == thread.parent_id
+        Thread.parent_id == thread.parent_id,
     )
 
     if direction == "up":
