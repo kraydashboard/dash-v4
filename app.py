@@ -928,6 +928,28 @@ def index():
         start_date = base_week - timedelta(days=35)
         end_date = base_week + timedelta(days=6)
 
+        all_cal_days = Calendar.query.filter(
+            Calendar.actual_date >= start_date, 
+            Calendar.actual_date <= end_date
+        ).all()
+        
+        off_routine_map = {c.actual_date: c.off_routine_flag for c in all_cal_days}
+
+        intent_entries = IntentEntry.query.filter(
+            IntentEntry.entry_date >= start_date, 
+            IntentEntry.entry_date <= end_date
+        ).all()
+        resil_entries = ResilienceEntry.query.filter(
+            ResilienceEntry.entry_date >= start_date, 
+            ResilienceEntry.entry_date <= end_date
+        ).all()
+
+        intent_data_map = {e.entry_date.strftime("%Y-%m-%d"): e for e in intent_entries}
+        resil_data_map = {e.entry_date.strftime("%Y-%m-%d"): e for e in resil_entries}
+
+        h_colors = {"survival": "#888", "2wk": "#7dd3fc", "1yr": "#3b82f6", "5yr": "#d946ef", "10yr": "#f59e0b"}
+        r_colors = {"baseline": "#fafafa", "not_okay": "#e0e0e0", "okay": "#81d4fa"}
+
         cal = ensure_calendar_entry(today)
         all_active = Thread.query.filter(Thread.status == "active").all()
 
@@ -966,6 +988,14 @@ def index():
 
         intent_today = IntentEntry.query.filter_by(entry_date=today).first()
         resil_today = ResilienceEntry.query.filter_by(entry_date=today).first()
+        intent_entries = IntentEntry.query.filter(IntentEntry.entry_date >= start_date, IntentEntry.entry_date <= end_date).all()
+        resil_entries = ResilienceEntry.query.filter(ResilienceEntry.entry_date >= start_date, ResilienceEntry.entry_date <= end_date).all()
+
+        intent_data_map = {e.entry_date.strftime("%Y-%m-%d"): e for e in intent_entries}
+        resil_data_map = {e.entry_date.strftime("%Y-%m-%d"): e for e in resil_entries}
+
+        h_colors = {"survival": "#888", "2wk": "#7dd3fc", "1yr": "#3b82f6", "5yr": "#d946ef", "10yr": "#f59e0b"}
+        r_colors = {"baseline": "#fafafa", "not_okay": "#e0e0e0", "okay": "#81d4fa"}
 
         ctx = {
             "off_routine": cal.off_routine_flag,
@@ -1041,6 +1071,7 @@ def index():
                             "status": sq.status if sq else "empty",
                             "is_padding": is_padding,
                             "miss_reason": sq.chain_end_reason if sq else "",
+                            "is_off_routine": off_routine_map.get(curr, False)
                         }
                     )
                 grouped_threads[cat].append(
@@ -1065,6 +1096,12 @@ def index():
             is_auth=session.get("logged_in", False),
             current_offset=week_offset,
             current_week_id=current_week_id,
+            intent_data_map=intent_data_map,
+    resil_data_map=resil_data_map,
+    h_colors=h_colors,
+    r_colors=r_colors,
+    timedelta=timedelta,
+    start_date=start_date
         )
     except Exception as e:
         return f"CRITICAL ERROR: {str(e)}"
