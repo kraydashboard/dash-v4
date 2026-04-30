@@ -337,16 +337,30 @@ function openAddModal(cat) {
 }
 
 function submitNewThread() {
+    const cadenceEl = document.getElementById('newThreadCadenceMode') || document.getElementById('newThreadCadence');
+    const timeEl = document.getElementById('newThreadTime');
+
     const payload = {
         name: document.getElementById('newThreadName').value,
         category: currentCat,
         redacted: document.getElementById('newThreadRedacted').value,
         sub_category: document.getElementById('newThreadSubCat').value,
         type: document.getElementById('newThreadType').value,
-        cadence: getCadenceValue('new'),
-        time_of_day: document.getElementById('newThreadTime').value
+        cadence: cadenceEl ? cadenceEl.value : 'daily',
+        time_of_day: timeEl ? timeEl.value : 'unspecified'
     };
-    fetch('/api/add_thread', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(r => r.json()).then(d => { if (d.success) location.reload(); else alert(d.error); });
+    
+    fetch('/api/add_thread', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify(payload) 
+    })
+    .then(r => r.json())
+    .then(d => { 
+        if (d.success) location.reload(); 
+        else alert(d.error); 
+    })
+    .catch(err => console.error("Помилка запиту:", err));
 }
 
 function openEditModal(id, name, redacted, subCat, type, cadence, time_of_day) {
