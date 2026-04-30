@@ -561,12 +561,9 @@
         }
 
         .habit-cell.padding {
-            background-color: #f5f5f5;
-            /* Дуже світлий сірий фон */
-            border: 1px solid #e0e0e0;
-            /* Світло-сіра рамка, щоб було видно контур */
+            background-color: #ebebeb;
+            border: 1px solid #d6d6d6;
             pointer-events: none;
-            /* Забороняє клікати на цей квадратик */
         }
 
         .habit-cell.fulfilled {
@@ -1733,3 +1730,5 @@
         .heat-4 {
             background: #196127;
         }
+
+        
