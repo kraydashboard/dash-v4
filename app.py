@@ -808,7 +808,7 @@ if request_bot:
                     )
 
             else:
-                request_bot.reply_to(message, "❌ Please send me a .json or .db file."
+                request_bot.reply_to(message, "❌ Please send me a .json or .db file.")
 
         except Exception as e:
             request_bot.reply_to(message, f"Error: {e}")
