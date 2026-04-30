@@ -294,8 +294,8 @@ function setSortMode(mode) {
         const typeMap = { 'work': 10000, 'scaffolding': 20000, 'family': 30000, 'quests': 35000, 'self care': 40000 };
 
         typeHeaders.forEach(h => { h.style.display = 'flex'; h.style.order = typeMap[h.dataset.cat] || 90000; });
-        labels.forEach(l => { l.style.order = (typeMap[l.dataset.cat] || 90000) + (1000 - parseInt(l.dataset.rank)); });
-        cells.forEach(c => { c.style.order = (typeMap[c.dataset.cat] || 90000) + (1000 - parseInt(c.dataset.rank)); });
+        labels.forEach(l => { l.style.order = (typeMap[l.dataset.cat] || 90000) + parseInt(l.dataset.idx); });
+        cells.forEach(c => { c.style.order = (typeMap[c.dataset.cat] || 90000) + parseInt(c.dataset.idx); });
     }
 }
 
@@ -330,15 +330,20 @@ function moveThread(id, direction) {
 }
 
 let currentCat = '';
-function openAddModal(cat) {
-    currentCat = cat;
-    document.getElementById('catNameDisplay').innerText = cat;
-    showModalWindow('addThreadModal');
-}
 
 function submitNewThread() {
-    const cadenceEl = document.getElementById('newThreadCadenceMode') || document.getElementById('newThreadCadence');
-    const timeEl = document.getElementById('newThreadTime');
+    const mode = document.getElementById('newThreadCadenceMode').value;
+    const parentId = document.getElementById('newThreadParent').value;
+    let cadenceValue = 'daily';
+
+    if (mode === 'specific') {
+        const checked = document.querySelectorAll('#newThreadDays input:checked');
+        if (checked.length > 0) {
+            cadenceValue = Array.from(checked).map(cb => cb.value).join(',');
+        } else {
+            alert("Please select days."); return;
+        }
+    }
 
     const payload = {
         name: document.getElementById('newThreadName').value,
@@ -346,45 +351,82 @@ function submitNewThread() {
         redacted: document.getElementById('newThreadRedacted').value,
         sub_category: document.getElementById('newThreadSubCat').value,
         type: document.getElementById('newThreadType').value,
-        cadence: cadenceEl ? cadenceEl.value : 'daily',
-        time_of_day: timeEl ? timeEl.value : 'unspecified'
+        cadence: cadenceValue,
+        parent_id: parentId ? parseInt(parentId) : null,
+        time_of_day: 'unspecified'
     };
-    
-    fetch('/api/add_thread', { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify(payload) 
-    })
-    .then(r => r.json())
-    .then(d => { 
-        if (d.success) location.reload(); 
-        else alert(d.error); 
-    })
-    .catch(err => console.error("Помилка запиту:", err));
+
+    fetch('/api/add_thread', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    }).then(r => r.json()).then(d => { if (d.success) location.reload(); });
 }
 
-function openEditModal(id, name, redacted, subCat, type, cadence, time_of_day) {
+function openEditModal(id, name, redacted, subCat, type, cadence, time, parentId, hasChildren) {
+    const labelEl = document.querySelector(`.habit-label[data-cat]:has(button[onclick*="'${id}'"])`);
+    const cat = labelEl ? labelEl.dataset.cat : '';
+
+    const select = document.getElementById('editThreadParent');
+    const options = select.querySelectorAll('option');
+    if (hasChildren) {
+        select.disabled = true;
+        select.title = "This habit already has derivative habits, so it cannot become a derivative itself.";
+    } else {
+        select.disabled = false;
+        select.title = "";
+    }
+
+    options.forEach(opt => {
+        const optCat = opt.getAttribute('data-cat');
+        if ((optCat === 'all' || optCat === cat) && opt.value != id) {
+            opt.style.display = 'block';
+        } else {
+            opt.style.display = 'none';
+        }
+    });
+
     document.getElementById('editThreadId').value = id;
     document.getElementById('editThreadName').value = name || '';
     document.getElementById('editThreadRedacted').value = redacted || '';
     document.getElementById('editThreadSubCat').value = subCat || '';
     document.getElementById('editThreadType').value = type || 'perpetual';
+
+    select.value = parentId || "";
+
     setCadenceValue('edit', cadence);
-    document.getElementById('editThreadTime').value = time_of_day || 'unspecified';
+    toggleCadenceMode('edit');
+
+    document.getElementById('editThreadTime').value = time || 'unspecified';
+
     showModalWindow('editThreadModal');
 }
 
 function submitEditThread() {
+    const parentIdVal = document.getElementById('editThreadParent').value;
+    const currentId = document.getElementById('editThreadId').value;
+
+    const finalParentId = (parentIdVal == currentId) ? null : (parentIdVal ? parseInt(parentIdVal) : null);
+
     const payload = {
-        id: document.getElementById('editThreadId').value,
+        id: currentId,
         name: document.getElementById('editThreadName').value,
         redacted: document.getElementById('editThreadRedacted').value,
         sub_category: document.getElementById('editThreadSubCat').value,
         type: document.getElementById('editThreadType').value,
         cadence: getCadenceValue('edit'),
+        parent_id: finalParentId,
         time_of_day: document.getElementById('editThreadTime').value
     };
-    fetch('/api/edit_thread', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(r => r.json()).then(d => { if (d.success) location.reload(); else alert(d.error); });
+
+    fetch('/api/edit_thread', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    }).then(r => r.json()).then(d => {
+        if (d.success) location.reload();
+        else alert(d.error);
+    });
 }
 
 function openContextModalFromHeader() {
@@ -655,7 +697,10 @@ function saveWeekContext() {
 
 function toggleCadenceMode(prefix) {
     const mode = document.getElementById(prefix + 'ThreadCadenceMode').value;
-    document.getElementById(prefix + 'ThreadDays').style.display = (mode === 'specific') ? 'flex' : 'none';
+    const daysDiv = document.getElementById(prefix + 'ThreadDays');
+    if (daysDiv) {
+        daysDiv.style.display = (mode === 'specific') ? 'flex' : 'none';
+    }
 }
 
 function getCadenceValue(prefix) {
@@ -669,7 +714,7 @@ function setCadenceValue(prefix, val) {
     const modeSelect = document.getElementById(prefix + 'ThreadCadenceMode');
     const daysDiv = document.getElementById(prefix + 'ThreadDays');
     const checkboxes = daysDiv.querySelectorAll('input');
-    
+
     checkboxes.forEach(cb => cb.checked = false);
 
     if (!val || val === 'daily' || !val.includes(',')) {
@@ -684,3 +729,107 @@ function setCadenceValue(prefix, val) {
         });
     }
 }
+
+function openAddModal(cat) {
+    currentCat = cat;
+    document.getElementById('catNameDisplay').innerText = cat;
+
+    const select = document.getElementById('newThreadParent');
+    const options = select.querySelectorAll('option');
+
+    select.value = "";
+
+    options.forEach(opt => {
+        const optCat = opt.getAttribute('data-cat');
+        if (optCat === 'all' || optCat === cat) {
+            opt.style.display = 'block';
+        } else {
+            opt.style.display = 'none';
+        }
+    });
+
+    document.getElementById('newThreadName').value = '';
+    showModalWindow('addThreadModal');
+}
+
+let focusModeActive = false;
+
+function toggleFocusMode() {
+    focusModeActive = !focusModeActive;
+    const btn = document.getElementById('focusBtn');
+
+    btn.classList.toggle('black', focusModeActive);
+
+    const chicagoTimeStr = new Date().toLocaleString("en-US", { timeZone: "America/Chicago" });
+    const today = new Date(chicagoTimeStr);
+    const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+
+    const habitIndices = [...new Set(Array.from(document.querySelectorAll('.habit-label')).map(l => l.dataset.idx))];
+
+    habitIndices.forEach(idx => {
+        const label = document.querySelector(`.habit-label[data-idx="${idx}"]`);
+        const cells = document.querySelectorAll(`.habit-cell[data-idx="${idx}"]`);
+
+        const todayCell = document.querySelector(`.habit-cell[data-idx="${idx}"][data-date="${todayStr}"]`);
+
+        if (focusModeActive) {
+            if (todayCell && todayCell.classList.contains('padding')) {
+                label.style.display = 'none';
+                cells.forEach(c => c.style.display = 'none');
+            }
+        } else {
+            label.style.display = 'flex';
+            cells.forEach(c => c.style.display = 'block');
+        }
+    });
+}
+
+function toggleQuickEdit() {
+    document.body.classList.toggle('show-quick-edit');
+    const isActive = document.body.classList.contains('show-quick-edit');
+    localStorage.setItem('quickEditMode', isActive);
+}
+
+function quickEditSave(threadId, fieldChanged) {
+    const panel = document.querySelector(`.qe-panel[data-id="${threadId}"]`);
+    if (!panel) return;
+
+    const parentId = panel.querySelector('.qe-parent').value;
+    const checkboxes = panel.querySelectorAll('.qe-cadence input:checked');
+
+    let cadence = 'daily';
+    if (checkboxes.length > 0 && checkboxes.length < 7) {
+        cadence = Array.from(checkboxes).map(cb => cb.value).join(',');
+    } else if (checkboxes.length === 0) {
+        cadence = 'none';
+    }
+
+    const payload = {
+        id: threadId,
+        name: panel.dataset.name,
+        redacted: panel.dataset.redacted,
+        sub_category: panel.dataset.subcat,
+        type: panel.dataset.type,
+        cadence: cadence,
+        parent_id: parentId ? parseInt(parentId) : null,
+        time_of_day: panel.dataset.time
+    };
+
+    fetch('/api/edit_thread', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    }).then(r => r.json()).then(d => {
+        if (d.success) {
+            if (fieldChanged === 'parent') {
+                location.reload();
+            }
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (localStorage.getItem('quickEditMode') === 'true') {
+        document.body.classList.add('show-quick-edit');
+    }
+});
