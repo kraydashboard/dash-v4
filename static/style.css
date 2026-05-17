@@ -763,7 +763,7 @@
 
         .day-context-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(3, 1fr);
             gap: 16px;
             margin-bottom: 20px;
         }
@@ -1919,3 +1919,77 @@
         .grid-corner-nav {
             grid-row: 1 / span 6 !important;
         }
+
+        .collapse-btn {
+            background: none;
+            border: none;
+            font-size: 10px;
+            color: #888;
+            cursor: pointer;
+            margin-right: 4px;
+            padding: 0 4px;
+            width: 16px;
+            text-align: center;
+            transition: color 0.2s;
+        }
+
+        .collapse-btn:hover {
+            color: #1a1a1a;
+        }
+
+        .hidden-child {
+            display: none !important;
+        }
+
+/* --- Desktop Vertical Toolbar --- */
+@media (min-width: 769px) {
+    .hide-on-desktop { display: none !important; }
+}
+@media (max-width: 768px) {
+    .hide-on-mobile { display: none !important; }
+}
+
+.desktop-toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;              
+    align-items: center;
+    width: 34px;       
+    flex-shrink: 0;
+}
+
+.desktop-toolbar .control-btn {
+    width: 100%;
+    height: 34px;         
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;     
+    border-radius: 6px;  
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.desktop-toolbar .toggle-group.vertical {
+    flex-direction: column;
+    width: 100%;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    margin-right: 0;
+}
+
+.desktop-toolbar .toggle-group.vertical .tgl-btn {
+    width: 100%;
+    height: 34px;        
+    border-left: none;
+    border-bottom: 1px solid #e0e0e0;
+    padding: 0;
+    font-size: 15px;   
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.desktop-toolbar .toggle-group.vertical .tgl-btn:last-child {
+    border-bottom: none;
+}
