@@ -42,6 +42,7 @@ else:
         )
 
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_pre_ping": True,
@@ -87,6 +88,7 @@ class Thread(db.Model):
     type = db.Column(db.String(20))
     cadence = db.Column(db.String(50))
     parent_id = db.Column(db.Integer, db.ForeignKey("threads.thread_id"), nullable=True)
+    default_collapsed = db.Column(db.Boolean, default=False)
 
 
 class Chain(db.Model):
@@ -129,6 +131,8 @@ class Calendar(db.Model):
     bh_caffeine = db.Column(db.Boolean, default=False)
     bh_alcohol = db.Column(db.Boolean, default=False)
     bh_thc = db.Column(db.Boolean, default=False)
+    backlog_in = db.Column(db.Text, default="")
+    backlog_out = db.Column(db.Text, default="")
 
 
 class WeekContext(db.Model):
@@ -136,6 +140,11 @@ class WeekContext(db.Model):
     week_id = db.Column(db.String(20), primary_key=True)
     header = db.Column(db.Text, default="")
     notes = db.Column(db.Text, default="")
+
+class MonthContext(db.Model):
+    __tablename__ = "month_contexts"
+    month_id = db.Column(db.String(20), primary_key=True)
+    goal = db.Column(db.Text, default="")
 
 
 class BoardItem(db.Model):
@@ -326,10 +335,17 @@ def is_day_fulfilled(thread, date_obj, squares_map):
 
 def create_full_backup_json():
     data = {}
+    
     data["week_contexts"] = [
         {"week_id": w.week_id, "header": w.header, "notes": w.notes}
         for w in WeekContext.query.all()
     ]
+
+    data["month_contexts"] = [
+        {"month_id": m.month_id, "goal": m.goal}
+        for m in MonthContext.query.all()
+    ]
+
     data["threads"] = [
         {
             "thread_id": t.thread_id,
@@ -347,6 +363,7 @@ def create_full_backup_json():
             "cadence": t.cadence,
             "thread_name_redacted": t.thread_name_redacted,
             "parent_id": t.parent_id,
+            "default_collapsed": t.default_collapsed,
         }
         for t in Thread.query.all()
     ]
@@ -383,6 +400,8 @@ def create_full_backup_json():
             "bh_caffeine": c.bh_caffeine,
             "bh_alcohol": c.bh_alcohol,
             "bh_thc": c.bh_thc,
+            "backlog_in": c.backlog_in,
+            "backlog_out": c.backlog_out,
         }
         for c in Calendar.query.all()
     ]
@@ -466,6 +485,9 @@ def restore_from_json(json_content):
         db.session.query(ResilienceEntry).delete()
         db.session.query(BotUser).delete()
         db.session.query(PartnerRequest).delete()
+        db.session.query(MonthContext).delete()
+        for m in data.get("month_contexts", []):
+            db.session.add(MonthContext(month_id=m["month_id"], goal=m.get("goal", "")))
 
         valid_threads = {t["thread_id"] for t in data.get("threads", [])}
         valid_chains = {
@@ -508,6 +530,7 @@ def restore_from_json(json_content):
                 cadence=t.get("cadence"),
                 thread_name_redacted=t.get("thread_name_redacted"),
                 parent_id=t.get("parent_id"),
+                default_collapsed=t.get("default_collapsed", False),
             )
             db.session.add(th)
 
@@ -602,6 +625,8 @@ def restore_from_json(json_content):
                 bh_caffeine=c.get("bh_caffeine", False),
                 bh_alcohol=c.get("bh_alcohol", False),
                 bh_thc=c.get("bh_thc", False),
+                backlog_in=c.get("backlog_in", ""),
+                backlog_out=c.get("backlog_out", ""),
             )
             db.session.add(cal)
 
@@ -872,6 +897,7 @@ def login_required(f):
 def api_login():
     pwd = request.json.get("password", "")
     if hashlib.sha256(pwd.encode()).hexdigest() == HASH_WEB:
+        session.permanent = True
         session["logged_in"] = True
         return jsonify({"success": True})
     return jsonify({"success": False})
@@ -946,6 +972,7 @@ def index():
 
         intent_data_map = {e.entry_date.strftime("%Y-%m-%d"): e for e in intent_entries}
         resil_data_map = {e.entry_date.strftime("%Y-%m-%d"): e for e in resil_entries}
+        cal_data_map = {c.actual_date.strftime("%Y-%m-%d"): c for c in all_cal_days}
 
         h_colors = {"survival": "#888", "2wk": "#7dd3fc", "1yr": "#3b82f6", "5yr": "#d946ef", "10yr": "#f59e0b"}
         r_colors = {"baseline": "#fafafa", "not_okay": "#e0e0e0", "okay": "#81d4fa"}
@@ -1064,6 +1091,10 @@ def index():
                         except:
                             pass
 
+                    is_before_creation = False
+                    if th.created_at and curr < th.created_at:
+                        is_before_creation = True
+
                     days.append(
                         {
                             "date": curr.strftime("%Y-%m-%d"),
@@ -1071,7 +1102,8 @@ def index():
                             "status": sq.status if sq else "empty",
                             "is_padding": is_padding,
                             "miss_reason": sq.chain_end_reason if sq else "",
-                            "is_off_routine": off_routine_map.get(curr, False)
+                            "is_off_routine": off_routine_map.get(curr, False),
+                            "is_before_creation": is_before_creation
                         }
                     )
                 grouped_threads[cat].append(
@@ -1086,6 +1118,10 @@ def index():
                 {"id": w_id, "label": f"Week {w_start.isocalendar()[1]}"}
             )
 
+        current_month_id = today.strftime("%Y-%m")
+        month_context_entry = db.session.get(MonthContext, current_month_id)
+        month_goal = month_context_entry.goal if month_context_entry else ""
+
         return render_template(
             "dashboard.html",
             grouped_threads=grouped_threads,
@@ -1098,10 +1134,12 @@ def index():
             current_week_id=current_week_id,
             intent_data_map=intent_data_map,
     resil_data_map=resil_data_map,
+    cal_data_map=cal_data_map,
     h_colors=h_colors,
     r_colors=r_colors,
     timedelta=timedelta,
-    start_date=start_date
+    start_date=start_date,
+    month_goal=month_goal
         )
     except Exception as e:
         return f"CRITICAL ERROR: {str(e)}"
@@ -1127,6 +1165,8 @@ def get_day_info():
                 "bh_caffeine": cal.bh_caffeine if cal else False,
                 "bh_alcohol": cal.bh_alcohol if cal else False,
                 "bh_thc": cal.bh_thc if cal else False,
+                "backlog_in": cal.backlog_in if cal else "",
+                "backlog_out": cal.backlog_out if cal else "",
                 "intent_horizon": intent.horizon if intent else "survival",
                 "intent_header": intent.content if intent else "",
                 "intent_notes": intent.notes if intent else "",
@@ -1138,6 +1178,19 @@ def get_day_info():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
 
+@app.route("/api/update_month_goal", methods=["POST"])
+@login_required
+def update_month_goal():
+    data = request.json
+    today = datetime.datetime.now(ZoneInfo("America/Chicago")).date()
+    month_id = today.strftime("%Y-%m")
+    mc = db.session.get(MonthContext, month_id)
+    if not mc:
+        mc = MonthContext(month_id=month_id)
+        db.session.add(mc)
+    mc.goal = data.get("goal", "")
+    db.session.commit()
+    return jsonify({"success": True})
 
 @app.route("/api/update_day_context", methods=["POST"])
 @login_required
@@ -1167,6 +1220,10 @@ def update_day_context():
         cal.bh_alcohol = data["bh_alcohol"]
     if "bh_thc" in data:
         cal.bh_thc = data["bh_thc"]
+    if "backlog_in" in data:
+        cal.backlog_in = data["backlog_in"]
+    if "backlog_out" in data:
+        cal.backlog_out = data["backlog_out"]
 
     if "intent_horizon" in data:
         intent = IntentEntry.query.filter_by(entry_date=today_date).first()
@@ -1232,6 +1289,7 @@ def add_thread():
             type=data.get("type", "perpetual"),
             cadence=data.get("cadence", "daily"),
             parent_id=data.get("parent_id"),
+            default_collapsed=data.get("default_collapsed", False),
             status="active",
             rank=max_rank + 1,
             created_at=today,
@@ -1288,6 +1346,7 @@ def edit_thread():
                     )
 
             thread.parent_id = new_parent_id
+            thread.default_collapsed = data.get("default_collapsed", False)
 
             db.session.commit()
             return jsonify({"success": True})
@@ -1346,8 +1405,14 @@ with app.app_context():
         "bh_modafinil",
         "bh_caffeine",
         "bh_alcohol",
-        "bh_thc",
+        "bh_thc", "backlog_in", "backlog_out"
     ]:
+        try:
+            db.session.execute(db.text(f"ALTER TABLE calendar ADD COLUMN {col} TEXT DEFAULT ''"))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
         try:
             db.session.execute(
                 db.text(f"ALTER TABLE calendar ADD COLUMN {col} BOOLEAN DEFAULT FALSE")
@@ -1383,6 +1448,14 @@ with app.app_context():
     except Exception as e:
         db.session.rollback()
         print(f"Migration note (parent_id): {e}")
+
+    try:
+        db.session.execute(
+            db.text("ALTER TABLE threads ADD COLUMN default_collapsed BOOLEAN DEFAULT FALSE")
+        )
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
     if db.engine.name == "postgresql":
         try:
@@ -1595,4 +1668,4 @@ def delete_log():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000, debug=False, use_reloader=False)
+    app.run(host="0.0.0.0", port=8080, debug=False, use_reloader=False)
