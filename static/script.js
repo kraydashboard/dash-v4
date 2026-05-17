@@ -353,6 +353,7 @@ function submitNewThread() {
         type: document.getElementById('newThreadType').value,
         cadence: cadenceValue,
         parent_id: parentId ? parseInt(parentId) : null,
+        default_collapsed: document.getElementById('newThreadCollapsed').checked,
         time_of_day: 'unspecified'
     };
 
@@ -363,7 +364,7 @@ function submitNewThread() {
     }).then(r => r.json()).then(d => { if (d.success) location.reload(); });
 }
 
-function openEditModal(id, name, redacted, subCat, type, cadence, time, parentId, hasChildren) {
+function openEditModal(id, name, redacted, subCat, type, cadence, time, parentId, hasChildren, defaultCollapsed) {
     const labelEl = document.querySelector(`.habit-label[data-cat]:has(button[onclick*="'${id}'"])`);
     const cat = labelEl ? labelEl.dataset.cat : '';
 
@@ -398,6 +399,9 @@ function openEditModal(id, name, redacted, subCat, type, cadence, time, parentId
     toggleCadenceMode('edit');
 
     document.getElementById('editThreadTime').value = time || 'unspecified';
+    document.getElementById('editThreadCollapsed').checked = (defaultCollapsed === true || defaultCollapsed === 'true');
+
+    toggleEditCollapsedVisibility();
 
     showModalWindow('editThreadModal');
 }
@@ -416,6 +420,7 @@ function submitEditThread() {
         type: document.getElementById('editThreadType').value,
         cadence: getCadenceValue('edit'),
         parent_id: finalParentId,
+        default_collapsed: document.getElementById('editThreadCollapsed').checked,
         time_of_day: document.getElementById('editThreadTime').value
     };
 
@@ -462,6 +467,8 @@ async function openContextModalForDate(dateStr) {
             document.getElementById('bh_caffeine').checked = data.bh_caffeine;
             document.getElementById('bh_alcohol').checked = data.bh_alcohol;
             document.getElementById('bh_thc').checked = data.bh_thc;
+            document.getElementById('dcBacklogIn').value = data.backlog_in || "";
+            document.getElementById('dcBacklogOut').value = data.backlog_out || "";
 
             dcIntentHorizon = data.intent_horizon || 'survival';
             document.getElementById('dcIntentHeader').value = data.intent_header;
@@ -493,6 +500,8 @@ function saveContext() {
         bh_caffeine: document.getElementById('bh_caffeine').checked,
         bh_alcohol: document.getElementById('bh_alcohol').checked,
         bh_thc: document.getElementById('bh_thc').checked,
+        backlog_in: document.getElementById('dcBacklogIn').value,
+        backlog_out: document.getElementById('dcBacklogOut').value,
         intent_horizon: dcIntentHorizon,
         intent_header: document.getElementById('dcIntentHeader').value,
         intent_notes: document.getElementById('dcIntentNotes').value,
@@ -626,6 +635,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    document.querySelectorAll('.collapse-btn').forEach(btn => {
+        if (btn.innerText.trim() === '▶') {
+            const match = btn.getAttribute('onclick').match(/'([^']+)'/);
+            if (match) {
+                toggleChildren(match[1], btn, 'collapse');
+            }
+        }
+    });
+
+    toggleFocusMode();
 });
 
 function toggleMobileView() {
@@ -636,6 +656,40 @@ function toggleMobileView() {
         btn.innerHTML = '📊 Tracker';
     } else {
         btn.innerHTML = '📝 Log';
+    }
+}
+
+function toggleChildren(parentId, btnElement = null, forceState = null) {
+    const childrenCells = document.querySelectorAll(`.habit-cell[data-parent-id="${parentId}"]`);
+    
+    const childIndices = new Set();
+    childrenCells.forEach(cell => childIndices.add(cell.getAttribute('data-idx')));
+
+    let isCollapsing;
+    if (forceState !== null) {
+        isCollapsing = forceState === 'collapse';
+    } else {
+        if (btnElement) {
+            isCollapsing = btnElement.innerText.trim() === '▼';
+        } else {
+            isCollapsing = true;
+        }
+    }
+
+    childIndices.forEach(idx => {
+        document.querySelectorAll(`.habit-label[data-idx="${idx}"]`).forEach(el => {
+            el.classList.toggle('hidden-child', isCollapsing);
+        });
+        document.querySelectorAll(`.habit-cell[data-idx="${idx}"]`).forEach(el => {
+            el.classList.toggle('hidden-child', isCollapsing);
+        });
+    });
+
+    if (!btnElement) {
+        btnElement = document.querySelector(`.collapse-btn[onclick*="${parentId}"]`);
+    }
+    if (btnElement) {
+        btnElement.innerText = isCollapsing ? '▶' : '▼';
     }
 }
 
@@ -749,6 +803,7 @@ function openAddModal(cat) {
     });
 
     document.getElementById('newThreadName').value = '';
+    toggleAddCollapsedVisibility();
     showModalWindow('addThreadModal');
 }
 
@@ -756,9 +811,13 @@ let focusModeActive = false;
 
 function toggleFocusMode() {
     focusModeActive = !focusModeActive;
+    
     const btn = document.getElementById('focusBtn');
+    if (btn) btn.classList.toggle('black', focusModeActive);
 
-    btn.classList.toggle('black', focusModeActive);
+    document.querySelectorAll('.focus-btn-class').forEach(b => {
+        b.classList.toggle('black', focusModeActive);
+    });
 
     const chicagoTimeStr = new Date().toLocaleString("en-US", { timeZone: "America/Chicago" });
     const today = new Date(chicagoTimeStr);
@@ -833,3 +892,25 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.classList.add('show-quick-edit');
     }
 });
+
+function toggleAddCollapsedVisibility() {
+    const parentId = document.getElementById('newThreadParent').value;
+    const container = document.getElementById('newThreadCollapsedContainer');
+    if (parentId) {
+        container.style.display = 'none';
+        document.getElementById('newThreadCollapsed').checked = false;
+    } else {
+        container.style.display = 'block';
+    }
+}
+
+function toggleEditCollapsedVisibility() {
+    const parentId = document.getElementById('editThreadParent').value;
+    const container = document.getElementById('editThreadCollapsedContainer');
+    if (parentId) {
+        container.style.display = 'none';
+        document.getElementById('editThreadCollapsed').checked = false;
+    } else {
+        container.style.display = 'block';
+    }
+}
