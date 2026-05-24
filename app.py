@@ -121,6 +121,7 @@ class Calendar(db.Model):
     top_work_priority = db.Column(db.Text, default="")
     top_other_priority = db.Column(db.String(200), default="")
     off_routine_flag = db.Column(db.Boolean, default=False)
+    routine_status = db.Column(db.String(20), default="neutral")
     off_routine_reason = db.Column(db.String(200), default="")
     project_type_this_week = db.Column(db.String(100), default="")
     day_meds = db.Column(db.Boolean, default=False)
@@ -140,6 +141,8 @@ class WeekContext(db.Model):
     week_id = db.Column(db.String(20), primary_key=True)
     header = db.Column(db.Text, default="")
     notes = db.Column(db.Text, default="")
+    is_hidden = db.Column(db.Boolean, default=False)
+    summary_status = db.Column(db.String(20), default="OK")
 
 class MonthContext(db.Model):
     __tablename__ = "month_contexts"
@@ -337,7 +340,13 @@ def create_full_backup_json():
     data = {}
     
     data["week_contexts"] = [
-        {"week_id": w.week_id, "header": w.header, "notes": w.notes}
+        {
+            "week_id": w.week_id, 
+            "header": w.header, 
+            "notes": w.notes, 
+            "is_hidden": w.is_hidden, 
+            "summary_status": w.summary_status
+        }
         for w in WeekContext.query.all()
     ]
 
@@ -502,6 +511,8 @@ def restore_from_json(json_content):
                     week_id=w["week_id"],
                     header=w.get("header", ""),
                     notes=w.get("notes", ""),
+                    is_hidden=w.get("is_hidden", False),
+                    summary_status=w.get("summary_status", "OK")
                 )
             )
 
@@ -938,6 +949,27 @@ def update_week_context():
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
+    
+@app.route("/api/update_week_toggle", methods=["POST"])
+@login_required
+def update_week_toggle():
+    data = request.json
+    week_id = data.get("week_id")
+    try:
+        wc = db.session.get(WeekContext, week_id)
+        if not wc:
+            wc = WeekContext(week_id=week_id)
+            db.session.add(wc)
+        
+        if "is_hidden" in data:
+            wc.is_hidden = data["is_hidden"]
+        if "summary_status" in data:
+            wc.summary_status = data["summary_status"]
+            
+        db.session.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
 
 
 @app.route("/")
@@ -959,7 +991,14 @@ def index():
             Calendar.actual_date <= end_date
         ).all()
         
-        off_routine_map = {c.actual_date: c.off_routine_flag for c in all_cal_days}
+        off_routine_map = {}
+        for c in all_cal_days:
+            if c.routine_status and c.routine_status != "neutral":
+                off_routine_map[c.actual_date] = c.routine_status
+            elif c.off_routine_flag:
+                off_routine_map[c.actual_date] = "off"
+            else:
+                off_routine_map[c.actual_date] = "neutral"
 
         intent_entries = IntentEntry.query.filter(
             IntentEntry.entry_date >= start_date, 
@@ -1102,7 +1141,7 @@ def index():
                             "status": sq.status if sq else "empty",
                             "is_padding": is_padding,
                             "miss_reason": sq.chain_end_reason if sq else "",
-                            "is_off_routine": off_routine_map.get(curr, False),
+                            "routine_status": off_routine_map.get(curr, "neutral"),
                             "is_before_creation": is_before_creation
                         }
                     )
@@ -1110,13 +1149,43 @@ def index():
                     {"info": th, "weeks": [days[j : j + 7] for j in range(0, 42, 7)]}
                 )
 
-        week_headers = []
+        week_ids_for_query = []
         for i in range(6):
             w_start = start_date + timedelta(days=i * 7)
             w_id = f"{w_start.isocalendar()[0]}-W{w_start.isocalendar()[1]:02d}"
-            week_headers.append(
-                {"id": w_id, "label": f"Week {w_start.isocalendar()[1]}"}
-            )
+            week_ids_for_query.append(w_id)
+            
+        week_contexts = WeekContext.query.filter(WeekContext.week_id.in_(week_ids_for_query)).all()
+        week_context_map = {wc.week_id: wc for wc in week_contexts}
+
+        week_headers = []
+        visible_count = 0
+        for i in range(6):
+            w_start = start_date + timedelta(days=i * 7)
+            w_id = f"{w_start.isocalendar()[0]}-W{w_start.isocalendar()[1]:02d}"
+            
+            wc = week_context_map.get(w_id)
+            w_header_text = wc.header if wc else ""
+            is_hidden = wc.is_hidden if wc else False
+            summary_status = wc.summary_status if wc else "OK"
+            has_context = bool(wc and (wc.header.strip() or wc.notes.strip()))
+            
+            tooltip_text = w_header_text if w_header_text else f"Open context for {w_id}"
+            
+            visible_idx = -1
+            if not is_hidden:
+                visible_idx = visible_count
+                visible_count += 1
+                
+            week_headers.append({
+                "id": w_id,
+                "label": f"Week {w_start.isocalendar()[1]}",
+                "tooltip": tooltip_text,
+                "has_context": has_context,
+                "is_hidden": is_hidden,
+                "summary_status": summary_status,
+                "visible_index": visible_idx
+            })
 
         current_month_id = today.strftime("%Y-%m")
         month_context_entry = db.session.get(MonthContext, current_month_id)
@@ -1129,17 +1198,18 @@ def index():
             ctx=ctx,
             today_date=today.strftime("%Y-%m-%d"),
             week_headers=week_headers,
+            total_visible_weeks=visible_count,
             is_auth=session.get("logged_in", False),
             current_offset=week_offset,
             current_week_id=current_week_id,
             intent_data_map=intent_data_map,
-    resil_data_map=resil_data_map,
-    cal_data_map=cal_data_map,
-    h_colors=h_colors,
-    r_colors=r_colors,
-    timedelta=timedelta,
-    start_date=start_date,
-    month_goal=month_goal
+            resil_data_map=resil_data_map,
+            cal_data_map=cal_data_map,
+            h_colors=h_colors,
+            r_colors=r_colors,
+            timedelta=timedelta,
+            start_date=start_date,
+            month_goal=month_goal
         )
     except Exception as e:
         return f"CRITICAL ERROR: {str(e)}"
@@ -1157,7 +1227,7 @@ def get_day_info():
         return jsonify(
             {
                 "success": True,
-                "off": cal.off_routine_flag if cal else False,
+                "routine_status": cal.routine_status if cal else "neutral",
                 "off_reason": cal.off_routine_reason if cal else "",
                 "bh_hydroxizine": cal.bh_hydroxizine if cal else False,
                 "bh_ritalin": cal.bh_ritalin if cal else False,
@@ -1203,8 +1273,9 @@ def update_day_context():
         today_date = datetime.datetime.now(ZoneInfo("America/Chicago")).date()
     cal = ensure_calendar_entry(today_date)
 
-    if "off_routine" in data:
-        cal.off_routine_flag = data["off_routine"]
+    if "routine_status" in data:
+        cal.routine_status = data["routine_status"]
+        cal.off_routine_flag = (data["routine_status"] == "off")
     if "off_reason" in data:
         cal.off_routine_reason = data["off_reason"]
 
@@ -1430,6 +1501,14 @@ with app.app_context():
         db.session.rollback()
 
     try:
+        db.session.execute(db.text("ALTER TABLE calendar ADD COLUMN routine_status VARCHAR(20) DEFAULT 'neutral'"))
+        db.session.commit()
+        db.session.execute(db.text("UPDATE calendar SET routine_status = 'off' WHERE off_routine_flag = TRUE OR off_routine_flag = 1"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    try:
         db.session.execute(
             db.text("ALTER TABLE intent_entries ADD COLUMN plan BOOLEAN DEFAULT FALSE")
         )
@@ -1456,6 +1535,13 @@ with app.app_context():
         db.session.commit()
     except Exception:
         db.session.rollback()
+
+    for col, col_type in [("is_hidden", "BOOLEAN DEFAULT FALSE"), ("summary_status", "VARCHAR(20) DEFAULT 'OK'")]:
+        try:
+            db.session.execute(db.text(f"ALTER TABLE week_contexts ADD COLUMN {col} {col_type}"))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
     if db.engine.name == "postgresql":
         try:
