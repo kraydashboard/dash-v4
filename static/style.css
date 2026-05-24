@@ -328,7 +328,7 @@
             background: #ffffff;
             border: 1px solid #e0e0e0;
             border-radius: 8px;
-            padding: 16px 0;
+            padding: 16px 20px 16px 0;
             flex: 1;
             overflow-y: auto;
             overflow-x: hidden;
@@ -416,7 +416,7 @@
             font-size: 9px;
             font-weight: 300;
             color: #d4d0c8;
-            padding-bottom: 0px;
+            padding-bottom: 5px;
         }
 
         .category-header {
@@ -821,7 +821,7 @@
         }
 
         .off-routine-cross {
-            color: #d32f2f;
+            color: #1a1a1a;
             font-size: 12px;
             font-family: var(--sans);
             font-weight: 700;
