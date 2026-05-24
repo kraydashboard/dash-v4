@@ -75,7 +75,7 @@
 
                 <div class="grid-wrapper desktop-only">
                     <div class="grid-container"
-                        style="grid-template-columns: max-content repeat({{ total_weeks }}, 14px 14px 14px 14px 14px 14px 14px 3px);">
+                        style="grid-template-columns: max-content repeat({{ total_visible_weeks }}, 14px 14px 14px 14px 14px 14px 14px 3px);">
                         {% if week_headers %}
                         <div class="grid-corner-nav">
                             {% if is_auth %}
@@ -97,27 +97,25 @@
                             <button type="button" class="grid-nav-btn"
                                 onclick="navigateWeeks({{ current_offset + 6 }})">→</button>
                         </div>
-                        {% set months_names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-                        %}
-                        {% set months_names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-                        %}
 
+                        {% set months_names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+                        %}
                         {% set ns = namespace(prev_month='') %}
 
                         {% for header in week_headers %}
-                        {% set w_idx = loop.index0 %}
+                        {% set outer_idx = loop.index0 %}
+                        {% if not header.is_hidden %}
+                        {% set w_idx = header.visible_index %}
                         {% set start_col = 2 + (w_idx * 8) %}
 
-                        {% set first_day = grouped_threads[categories[0]][0].weeks[w_idx][0].date %}
+                        {% set first_day = grouped_threads[categories[0]][0].weeks[outer_idx][0].date %}
                         {% set current_month = months_names[first_day.split('-')[1]|int - 1] %}
 
                         {% if current_month != ns.prev_month %}
-
                         {% set span_ns = namespace(weeks_count=0, diff_found=false) %}
                         {% for lookahead in week_headers %}
-                        {% set l_idx = loop.index0 %}
-                        {% if l_idx >= w_idx and not span_ns.diff_found %}
-                        {% set l_first_day = grouped_threads[categories[0]][0].weeks[l_idx][0].date %}
+                        {% if not lookahead.is_hidden and loop.index0 >= outer_idx and not span_ns.diff_found %}
+                        {% set l_first_day = grouped_threads[categories[0]][0].weeks[loop.index0][0].date %}
                         {% set l_month = months_names[l_first_day.split('-')[1]|int - 1] %}
 
                         {% if l_month == current_month %}
@@ -129,88 +127,90 @@
                         {% endfor %}
 
                         {% set span_cols = (span_ns.weeks_count * 8) - 1 %}
-
                         <div class="month-band" style="grid-column: {{ start_col }} / span {{ span_cols }};">
                             <span class="month-band-label">{{ current_month }}</span>
                             <span class="month-band-line"></span>
                         </div>
-
                         {% set ns.prev_month = current_month %}
                         {% endif %}
 
                         <div class="week-band" style="grid-column: {{ start_col }} / span 7;">
                             <span class="week-band-label" onclick="openWeekContextModal('{{ header.id }}')"
-                                title="Open context for {{ header.id }}">
+                                title="{{ header.tooltip }}">
                                 {{ header.label }}
                             </span>
                             <span class="week-band-line"></span>
                         </div>
-                        {% endfor %}
 
                         {% set days_letters = ['M','T','W','T','F','S','S'] %}
-                        {% for week in grouped_threads[categories[0]][0].weeks %}
-                        {% set w_idx = loop.index0 %}
-                        {% set start_col = 2 + (w_idx * 8) %}
-                        
-                        {% for day in week %}
+                        {% set week_days = grouped_threads[categories[0]][0].weeks[outer_idx] %}
+                        {% for day in week_days %}
                         {% set d_idx = loop.index0 %}
                         {% set col = 2 + (w_idx * 8) + d_idx %}
-                        
+
                         <div class="day-date" style="grid-column: {{ col }};"
                             onclick="openContextModalForDate('{{ day.date }}')">{{ day.date.split('-')[-1] }}</div>
 
                         <div class="day-letter" style="grid-column: {{ col }};">
                             {{ days_letters[d_idx] }}
-                            {% if day.is_off_routine %}
+                            {% if day.routine_status == 'off' %}
                             <span class="off-routine-cross">×</span>
+                            {% elif day.routine_status == 'good' %}
+                            <span class="off-routine-cross" style="font-size: 10px; margin-top: 4px;">v</span>
                             {% endif %}
                         </div>
 
                         {% set cal_day = cal_data_map.get(day.date) %}
-                        <div style="grid-column: {{ col }}; grid-row: 5; display: flex; gap: 2px; justify-content: center; align-items: end; padding-bottom: 2px;">
-                            {% set left_top = 'transparent' %}
-                            {% set right_top = 'transparent' %}
-                            {% if cal_day %}
-                                {% if cal_day.bh_modafinil %}{% set left_top = '#4caf50' %}  {% elif cal_day.bh_ritalin %}{% set left_top = '#ffca28' %}{% endif %} {% if cal_day.bh_alcohol %}{% set right_top = '#2196f3' %} {% elif cal_day.bh_thc %}{% set right_top = '#26a69a' %}{% endif %} {% endif %}
-                            <div style="width: 3px; height: 3px; border-radius: 50%; background: {{ left_top }};"></div>
-                            <div style="width: 3px; height: 3px; border-radius: 50%; background: {{ right_top }};"></div>
-                        </div>
+                        {% set cal_day = cal_data_map.get(day.date) %}
+                            <div style="grid-column: {{ col }}; grid-row: 5; display: flex; gap: 2px; justify-content: center; align-items: end; padding-bottom: 2px;">
+                                {% set left_top = 'transparent' %}
+                                {% set right_top = 'transparent' %}
+                                {% if cal_day %}
+                                    {% if cal_day.bh_modafinil %}{% set left_top = '#4caf50' %}  {% elif cal_day.bh_ritalin %}{% set left_top = '#ffca28' %}{% endif %} 
+                                    {% if cal_day.bh_alcohol %}{% set right_top = '#2196f3' %} {% elif cal_day.bh_thc %}{% set right_top = '#26a69a' %}{% endif %} 
+                                {% endif %}
+                                <div style="width: 6px; height: 3px; border-radius: 1px; background: {{ left_top }};"></div>
+                                <div style="width: 6px; height: 3px; border-radius: 1px; background: {{ right_top }};"></div>
+                            </div>
 
-                        <div style="grid-column: {{ col }}; grid-row: 8; display: flex; gap: 2px; justify-content: center; align-items: start; padding-top: 2px; margin-bottom: 8px;">
-                            {% set left_bot = 'transparent' %}
-                            {% set right_bot = 'transparent' %}
-                            {% if cal_day %}
-                                {% if cal_day.backlog_in %}{% set left_bot = '#795548' %}{% endif %} {% if cal_day.backlog_out %}{% set right_bot = '#4caf50' %}{% endif %} {% endif %}
-                            <div style="width: 3px; height: 3px; border-radius: 50%; background: {{ left_bot }};"></div>
-                            <div style="width: 3px; height: 3px; border-radius: 50%; background: {{ right_bot }};"></div>
-                        </div>
+                            <div style="grid-column: {{ col }}; grid-row: 8; display: flex; gap: 2px; justify-content: center; align-items: start; padding-top: 2px; margin-bottom: 8px;">
+                                {% set left_bot = 'transparent' %}
+                                {% set right_bot = 'transparent' %}
+                                {% if cal_day %}
+                                    {% if cal_day.backlog_in %}{% set left_bot = '#795548' %}{% endif %} 
+                                    {% if cal_day.backlog_out %}{% set right_bot = '#4caf50' %}{% endif %} 
+                                {% endif %}
+                                <div style="width: 6px; height: 3px; border-radius: 1px; background: {{ left_bot }};"></div>
+                                <div style="width: 6px; height: 3px; border-radius: 1px; background: {{ right_bot }};"></div>
+                            </div>
                         {% endfor %}
 
                         <div class="week-status-strip"
                             style="grid-column: {{ start_col }} / span 7; grid-row: 6; margin-top: 2px;">
-                            {% for day in week %}
+                            {% for day in week_days %}
                             {% set entry = intent_data_map.get(day.date) %}
                             <div class="status-day-segment"
                                 style="background: {{ h_colors.get(entry.horizon, 'transparent') if entry else 'transparent' }};"
-                                title="{% if entry and entry.content %}{{ entry.content }}{% elif entry %}Intent: {{ entry.horizon }}{% endif %}"></div>
+                                title="{% if entry and entry.content %}{{ entry.content }}{% elif entry %}Intent: {{ entry.horizon }}{% endif %}">
+                            </div>
                             {% endfor %}
                         </div>
 
                         <div class="week-status-strip"
                             style="grid-column: {{ start_col }} / span 7; grid-row: 7; margin-top: 2px;">
-                            {% for day in week %}
+                            {% for day in week_days %}
                             {% set entry = resil_data_map.get(day.date) %}
                             <div class="status-day-segment"
                                 style="background: {{ r_colors.get(entry.status, 'transparent') if entry else 'transparent' }};"
-                                title="{% if entry and entry.content %}{{ entry.content }}{% elif entry %}Resilience: {{ entry.status }}{% endif %}"></div>
+                                title="{% if entry and entry.content %}{{ entry.content }}{% elif entry %}Resilience: {{ entry.status }}{% endif %}">
+                            </div>
                             {% endfor %}
                         </div>
 
+                        {% endif %}
                         {% endfor %}
 
-                        {% endif %}
-
-                        {% set ns_sort = namespace(idx=0) %}
+                        {% endif %} {% set ns_sort = namespace(idx=0) %}
                         {% for cat in categories %}
                         <div class="category-header type-header" data-cat="{{ cat }}">
                             <span>
@@ -300,8 +300,13 @@
                     </div>
 
                     {% for week in item.weeks %}
-                    {% set w_idx = loop.index0 %}
+                    {% set raw_w_idx = loop.index0 %}
+                    {% set corresponding_header = week_headers[raw_w_idx] %}
+
+                    {% if not corresponding_header.is_hidden %}
+                    {% set w_idx = corresponding_header.visible_index %}
                     {% set is_last_week = loop.last %}
+
                     {% for day in week %}
                     {% set d_idx = loop.index0 %}
                     {% set current_col = 2 + (w_idx * 8) + d_idx %}
@@ -316,12 +321,7 @@
                         oncontextmenu="handleRightClick(event, this)">
                     </div>
                     {% endif %}
-
-                    {% endfor %}
-                    {% endfor %}
-                    {% endfor %}
-                    {% endfor %}
-
+                    {% endfor %} {% endif %} {% endfor %} {% endfor %} {% endfor %}
                 </div>
             </div>
 
@@ -330,7 +330,8 @@
                     {% if week_headers %}
                     {% set last_header = week_headers[-1] %}
                     <div class="week-band" style="grid-column: 2 / span 7;">
-                        <span class="week-band-label" onclick="openWeekContextModal('{{ last_header.id }}')">
+                        <span class="week-band-label" onclick="openWeekContextModal('{{ last_header.id }}')"
+                            title="{{ last_header.tooltip }}">
                             {{ last_header.label }}
                         </span>
                         <span class="week-band-line"></span>
@@ -854,86 +855,85 @@
         </div>
 
         <div class="desktop-toolbar hide-on-mobile">
-                <button class="control-btn" onclick="toggleQuickEdit()" title="Quick view">⚙️</button>
-                
-                <div class="toggle-group vertical">
-                    <button class="tgl-btn sort-tgl" data-mode="aggregate" onclick="setSortMode('aggregate')" title="Helicopter">🚁</button>
-                    <button class="tgl-btn sort-tgl active" data-mode="type" onclick="setSortMode('type')" title="Tracker">📊</button>
-                    <button class="tgl-btn sort-tgl" data-mode="calendar" onclick="setSortMode('calendar')" title="Calendar">🗓️</button>
-                </div>
-                
-                <button class="control-btn focus-btn-class" onclick="toggleFocusMode()" title="Focus">🎯</button>
-                
-                {% if is_auth %}
-                <button class="control-btn edit-toggle-btn" onclick="toggleEditMode()" title="Edit Habits">✏️</button>
-                <button class="control-btn" onclick="openContextModalFromHeader()" title="Day Context">📝</button>
-                <button class="control-btn" onclick="logoutAuth()" title="Lock Tracker">🔒</button>
-                {% else %}
-                <button class="control-btn" onclick="showModalWindow('loginModal')" title="Unlock Tracker">🔓</button>
-                {% endif %}
+            <button class="control-btn" onclick="toggleQuickEdit()" title="Quick view">⚙️</button>
+
+            <div class="toggle-group vertical">
+                <button class="tgl-btn sort-tgl" data-mode="aggregate" onclick="setSortMode('aggregate')"
+                    title="Helicopter">🚁</button>
+                <button class="tgl-btn sort-tgl active" data-mode="type" onclick="setSortMode('type')"
+                    title="Tracker">📊</button>
+                <button class="tgl-btn sort-tgl" data-mode="calendar" onclick="setSortMode('calendar')"
+                    title="Calendar">🗓️</button>
             </div>
 
+            <button class="control-btn focus-btn-class" onclick="toggleFocusMode()" title="Focus">🎯</button>
+
+            {% if is_auth %}
+            <button class="control-btn" onclick="showModalWindow('weekManagerModal')" title="Manage Weeks">📆</button>
+            <button class="control-btn" onclick="openContextModalFromHeader()" title="Day Context">📝</button>
+            <button class="control-btn" onclick="logoutAuth()" title="Lock Tracker">🔒</button>
+            {% else %}
+            <button class="control-btn" onclick="showModalWindow('loginModal')" title="Unlock Tracker">🔓</button>
+            {% endif %}
+        </div>
+
         <div class="right-panel">
-            
-            <div class="year-stadium-widget hide-on-mobile" style="position: relative; margin-bottom: 16px; width: 100%; flex-shrink: 0;">
+
+            <div class="year-stadium-widget hide-on-mobile"
+                style="position: relative; margin-bottom: 16px; width: 100%; flex-shrink: 0;">
                 {% set current_m = today_date.split('-')[1]|int %}
-                {% set month_names = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'] %}
-                
+                {% set month_names = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
+                'September', 'October', 'November', 'December'] %}
+
                 {% set segments_data = [
-                    {'m': 1, 'letter': 'J', 'x': 114.76, 'y': 20.00},
-                    {'m': 2, 'letter': 'F', 'x': 164.27, 'y': 20.00},
-                    {'m': 3, 'letter': 'M', 'x': 213.78, 'y': 20.00},
-                    {'m': 4, 'letter': 'A', 'x': 260.89, 'y': 30.68},
-                    {'m': 5, 'letter': 'M', 'x': 279.82, 'y': 74.26},
-                    {'m': 6, 'letter': 'J', 'x': 253.76, 'y': 114.00},
-                    {'m': 7, 'letter': 'J', 'x': 205.24, 'y': 120.00},
-                    {'m': 8, 'letter': 'A', 'x': 155.73, 'y': 120.00},
-                    {'m': 9, 'letter': 'S', 'x': 106.22, 'y': 120.00},
-                    {'m': 10, 'letter': 'O', 'x': 59.11, 'y': 109.32},
-                    {'m': 11, 'letter': 'N', 'x': 40.18, 'y': 65.74},
-                    {'m': 12, 'letter': 'D', 'x': 66.24, 'y': 26.00}
+                {'m': 1, 'letter': 'J', 'x': 205.24, 'y': 120.00, 'dash_idx': 6},
+                {'m': 2, 'letter': 'F', 'x': 155.73, 'y': 120.00, 'dash_idx': 7},
+                {'m': 3, 'letter': 'M', 'x': 106.22, 'y': 120.00, 'dash_idx': 8},
+                {'m': 4, 'letter': 'A', 'x': 59.11, 'y': 109.32, 'dash_idx': 9},
+                {'m': 5, 'letter': 'M', 'x': 40.18, 'y': 65.74, 'dash_idx': 10},
+                {'m': 6, 'letter': 'J', 'x': 66.24, 'y': 26.00, 'dash_idx': 11},
+                {'m': 7, 'letter': 'J', 'x': 114.76, 'y': 20.00, 'dash_idx': 0},
+                {'m': 8, 'letter': 'A', 'x': 164.27, 'y': 20.00, 'dash_idx': 1},
+                {'m': 9, 'letter': 'S', 'x': 213.78, 'y': 20.00, 'dash_idx': 2},
+                {'m': 10, 'letter': 'O', 'x': 260.89, 'y': 30.68, 'dash_idx': 3},
+                {'m': 11, 'letter': 'N', 'x': 279.82, 'y': 74.26, 'dash_idx': 4},
+                {'m': 12, 'letter': 'D', 'x': 253.76, 'y': 114.00, 'dash_idx': 5}
                 ] %}
 
                 <svg viewBox="0 0 320 140" style="width: 100%; height: auto; display: block;">
-                    <path d="M 90 20 L 230 20 A 50 50 0 0 1 230 120 L 90 120 A 50 50 0 0 1 90 20 Z" fill="none" stroke="#e5e7eb" stroke-width="18" />
+                    <path d="M 90 20 L 230 20 A 50 50 0 0 1 230 120 L 90 120 A 50 50 0 0 1 90 20 Z" fill="none"
+                        stroke="#e5e7eb" stroke-width="18" />
 
                     {% for seg in segments_data %}
-                        {% set is_current = (seg.m == current_m) %}
-                        {% set color = '#dc2626' if is_current else '#e5e7eb' %}
+                    {% set is_current = (seg.m == current_m) %}
+                    {% set color = '#dc2626' if is_current else '#e5e7eb' %}
 
-                        <path d="M 90 20 L 230 20 A 50 50 0 0 1 230 120 L 90 120 A 50 50 0 0 1 90 20 Z"
-                              fill="none" stroke="{{ color }}" 
-                              stroke-width="18"
-                              pathLength="1200"
-                              stroke-dasharray="96 1104"
-                              stroke-dashoffset="{{ -100 * (seg.m - 1) }}"
-                              stroke-linecap="butt"
-                              style="transition: all 0.3s ease;" />
+                    <path d="M 90 20 L 230 20 A 50 50 0 0 1 230 120 L 90 120 A 50 50 0 0 1 90 20 Z" fill="none"
+                        stroke="{{ color }}" stroke-width="18" pathLength="1200" stroke-dasharray="96 1104"
+                        stroke-dashoffset="{{ -100 * seg.dash_idx }}" stroke-linecap="butt"
+                        style="transition: all 0.3s ease;" />
                     {% endfor %}
 
                     {% for seg in segments_data %}
-                        {% set is_current = (seg.m == current_m) %}
-                        <text x="{{ seg.x }}" y="{{ seg.y }}" 
-                              fill="{{ '#ffffff' if is_current else '#888888' }}" 
-                              font-size="9px" 
-                              font-weight="700" 
-                              font-family="var(--sans)"
-                              text-anchor="middle" 
-                              dominant-baseline="central"
-                              style="user-select: none; pointer-events: none;">{{ seg.letter }}</text>
+                    {% set is_current = (seg.m == current_m) %}
+                    <text x="{{ seg.x }}" y="{{ seg.y }}" fill="{{ '#ffffff' if is_current else '#888888' }}"
+                        font-size="9px" font-weight="700" font-family="var(--sans)" text-anchor="middle"
+                        dominant-baseline="central" style="user-select: none; pointer-events: none;">{{ seg.letter
+                        }}</text>
                     {% endfor %}
                 </svg>
 
-                <div style="position: absolute; top: 25%; left: 28%; right: 28%; bottom: 25%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; overflow: hidden;">
-                    <div style="font-size: clamp(9px, 1.8vw, 11px); font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; user-select: none;">
+                <div
+                    style="position: absolute; top: 25%; left: 28%; right: 28%; bottom: 25%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; overflow: hidden;">
+                    <div
+                        style="font-size: clamp(9px, 1.8vw, 11px); font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; user-select: none;">
                         {{ month_names[current_m] }}
                     </div>
                     <div id="monthGoalText" contenteditable="true"
-                         style="width: 100%; max-height: 100%; font-size: clamp(10px, 2.2vw, 13px); font-weight: 500; color: #1a1a1a; outline: none; padding: 0 2px; line-height: 1.25; overflow-y: auto; word-break: break-word; border-bottom: 1px dashed #ccc;"
-                         placeholder="Set a goal..."
-                         onblur="saveMonthGoal(this.innerText)">{{ month_goal }}</div>
+                        style="width: 100%; max-height: 100%; font-size: clamp(10px, 2.2vw, 13px); font-weight: 500; color: #1a1a1a; outline: none; padding: 0 2px; line-height: 1.25; overflow-y: auto; word-break: break-word; border-bottom: 1px dashed #ccc;"
+                        placeholder="Set a goal..." onblur="saveMonthGoal(this.innerText)">{{ month_goal }}</div>
                 </div>
-                
+
                 <script>
                     function saveMonthGoal(text) {
                         fetch('/api/update_month_goal', {
@@ -1129,12 +1129,36 @@
             <div class="modal-title" style="text-align:left; margin-bottom: 20px; font-weight: 700;">Day Context</div>
 
             <style>
-                .dc-macro-layout { display: flex; gap: 16px; align-items: stretch; margin-bottom: 20px; }
-                .dc-left-grid { flex: 2; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-content: start; }
-                .dc-right-col { flex: 1; display: flex; flex-direction: column; gap: 16px; }
+                .dc-macro-layout {
+                    display: flex;
+                    gap: 16px;
+                    align-items: stretch;
+                    margin-bottom: 20px;
+                }
+
+                .dc-left-grid {
+                    flex: 2;
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 16px;
+                    align-content: start;
+                }
+
+                .dc-right-col {
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 16px;
+                }
+
                 @media (max-width: 768px) {
-                    .dc-macro-layout { flex-direction: column; }
-                    .dc-left-grid { grid-template-columns: 1fr; }
+                    .dc-macro-layout {
+                        flex-direction: column;
+                    }
+
+                    .dc-left-grid {
+                        grid-template-columns: 1fr;
+                    }
                 }
             </style>
 
@@ -1145,17 +1169,23 @@
                         <div id="dcRoutineColors" style="display: flex; gap: 12px; margin-bottom: 12px;"></div>
                         <div class="m-label" style="margin-bottom: 4px;">Reason / Note</div>
                         <input type="text" id="ctxOffReason" value="{{ ctx.off_reason }}" class="m-input"
-                            style="border: 1.5px solid #1a1a1a; border-radius: 8px; margin-bottom: 0;" placeholder="Notes...">
+                            style="border: 1.5px solid #1a1a1a; border-radius: 8px; margin-bottom: 0;"
+                            placeholder="Notes...">
                     </div>
 
                     <div class="dc-box">
                         <div class="dc-box-title">Biohacking</div>
                         <div class="dc-bh-grid">
-                            <label><input type="checkbox" id="bh_hydroxizine" {% if ctx.bh_hydroxizine %}checked{% endif %}> Hydroxizine LN</label>
-                            <label><input type="checkbox" id="bh_ritalin" {% if ctx.bh_ritalin %}checked{% endif %}> Ritalin</label>
-                            <label><input type="checkbox" id="bh_modafinil" {% if ctx.bh_modafinil %}checked{% endif %}> Modafinil</label>
-                            <label><input type="checkbox" id="bh_caffeine" {% if ctx.bh_caffeine %}checked{% endif %}> Caffeine</label>
-                            <label><input type="checkbox" id="bh_alcohol" {% if ctx.bh_alcohol %}checked{% endif %}> Alcohol</label>
+                            <label><input type="checkbox" id="bh_hydroxizine" {% if ctx.bh_hydroxizine %}checked{% endif
+                                    %}> Hydroxizine LN</label>
+                            <label><input type="checkbox" id="bh_ritalin" {% if ctx.bh_ritalin %}checked{% endif %}>
+                                Ritalin</label>
+                            <label><input type="checkbox" id="bh_modafinil" {% if ctx.bh_modafinil %}checked{% endif %}>
+                                Modafinil</label>
+                            <label><input type="checkbox" id="bh_caffeine" {% if ctx.bh_caffeine %}checked{% endif %}>
+                                Caffeine</label>
+                            <label><input type="checkbox" id="bh_alcohol" {% if ctx.bh_alcohol %}checked{% endif %}>
+                                Alcohol</label>
                             <label><input type="checkbox" id="bh_thc" {% if ctx.bh_thc %}checked{% endif %}> THC</label>
                         </div>
                     </div>
@@ -1164,7 +1194,8 @@
                         <div class="dc-box-title">Intentionality</div>
                         <div class="cal-horizon-selector" id="dcIntentColors" style="margin-bottom: 12px;"></div>
                         <input type="text" id="dcIntentHeader" class="m-input" placeholder="Header (Briefly)..."
-                            value="{{ ctx.intent_header }}" style="border: 1.5px solid #1a1a1a; border-radius: 10px; margin-bottom: 8px;">
+                            value="{{ ctx.intent_header }}"
+                            style="border: 1.5px solid #1a1a1a; border-radius: 10px; margin-bottom: 8px;">
                         <textarea id="dcIntentNotes" class="m-input" placeholder="Detailed notes..."
                             style="min-height: 100px; border: 1.5px solid #1a1a1a; border-radius: 15px;">{{ ctx.intent_notes }}</textarea>
                     </div>
@@ -1173,7 +1204,8 @@
                         <div class="dc-box-title">Resilience</div>
                         <div class="cal-horizon-selector" id="dcResilColors" style="margin-bottom: 12px;"></div>
                         <input type="text" id="dcResilHeader" class="m-input" placeholder="Header (Briefly)..."
-                            value="{{ ctx.resil_header }}" style="border: 1.5px solid #1a1a1a; border-radius: 10px; margin-bottom: 8px;">
+                            value="{{ ctx.resil_header }}"
+                            style="border: 1.5px solid #1a1a1a; border-radius: 10px; margin-bottom: 8px;">
                         <textarea id="dcResilNotes" class="m-input" placeholder="Detailed notes..."
                             style="min-height: 100px; border: 1.5px solid #1a1a1a; border-radius: 15px;">{{ ctx.resil_notes }}</textarea>
                     </div>
@@ -1182,22 +1214,23 @@
                 <div class="dc-right-col">
                     <div class="dc-box" style="flex: 1; display: flex; flex-direction: column;">
                         <div class="dc-box-title">Backlog In</div>
-                        <textarea id="dcBacklogIn" class="m-input" 
-                            style="flex: 1; min-height: 120px; border: 1.5px solid #1a1a1a; border-radius: 12px; margin-bottom: 0; resize: none;" 
+                        <textarea id="dcBacklogIn" class="m-input"
+                            style="flex: 1; min-height: 120px; border: 1.5px solid #1a1a1a; border-radius: 12px; margin-bottom: 0; resize: none;"
                             placeholder="Notes..."></textarea>
                     </div>
 
                     <div class="dc-box" style="flex: 1; display: flex; flex-direction: column;">
                         <div class="dc-box-title">Backlog Out</div>
-                        <textarea id="dcBacklogOut" class="m-input" 
-                            style="flex: 1; min-height: 120px; border: 1.5px solid #1a1a1a; border-radius: 12px; margin-bottom: 0; resize: none;" 
+                        <textarea id="dcBacklogOut" class="m-input"
+                            style="flex: 1; min-height: 120px; border: 1.5px solid #1a1a1a; border-radius: 12px; margin-bottom: 0; resize: none;"
                             placeholder="Notes..."></textarea>
                     </div>
                 </div>
             </div>
 
             <div class="modal-buttons">
-                <button class="modal-btn cancel" onclick="hideModalWindow('contextModal')" style="flex: 1;">Close</button>
+                <button class="modal-btn cancel" onclick="hideModalWindow('contextModal')"
+                    style="flex: 1;">Close</button>
                 <button class="modal-btn black" onclick="saveContext()" style="flex: 2;">Save Daily Context</button>
             </div>
         </div>
@@ -1250,6 +1283,55 @@
             <div class="modal-buttons">
                 <button class="modal-btn cancel" onclick="hideModalWindow('loginModal')">Cancel</button>
                 <button class="modal-btn black" onclick="submitAuth()">Unlock</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="weekManagerModal">
+        <div class="modal-content" style="max-width: 500px; width: 95%;">
+            <div class="modal-title" style="text-align: left; margin-bottom: 20px;">Weeks Overview</div>
+
+            <table style="width: 100%; border-collapse: collapse; text-align: left; margin-bottom: 20px;">
+                <thead>
+                    <tr style="border-bottom: 2px solid #1a1a1a;">
+                        <th style="padding: 8px 4px; font-weight: 600; color: #666;">Week</th>
+                        <th style="padding: 8px 4px; font-weight: 600; text-align: center; color: #666;">Context</th>
+                        <th style="padding: 8px 4px; font-weight: 600; text-align: center; color: #666;">Hide</th>
+                        <th style="padding: 8px 4px; font-weight: 600; text-align: center; color: #666;">Summary</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for header in week_headers %}
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding: 12px 4px; font-weight: 500; font-size: 15px;">{{ header.label }}</td>
+                        <td style="padding: 12px 4px; text-align: center;">
+                            <button class="l-btn" style="font-size: 18px;"
+                                onclick="hideModalWindow('weekManagerModal'); openWeekContextModal('{{ header.id }}');"
+                                title="Open Context">
+                                {{ '📝' if header.has_context else '📄' }}
+                            </button>
+                        </td>
+                        <td style="padding: 12px 4px; text-align: center;">
+                            <input type="checkbox" style="transform: scale(1.3); cursor: pointer;" {% if
+                                header.is_hidden %}checked{% endif %}
+                                onchange="saveWeekToggle('{{ header.id }}', 'is_hidden', this.checked)">
+                        </td>
+                        <td style="padding: 12px 4px; text-align: center;">
+                            <button class="control-btn"
+                                style="padding: 6px 12px; font-size: 12px; font-weight: 700; width: 85px; 
+                                           {% if header.summary_status == 'NOT OK' %}background-color: #ffebee; color: #d32f2f; border-color: #d32f2f;{% endif %}"
+                                onclick="toggleWeekSummary(this, '{{ header.id }}')">
+                                {{ header.summary_status }}
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" onclick="hideModalWindow('weekManagerModal')"
+                    style="width: 100%;">Close</button>
             </div>
         </div>
     </div>
