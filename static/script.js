@@ -1,9 +1,9 @@
 let dcIntentHorizon = window.APP_CONFIG.intentHorizon;
 let dcResilStatus = window.APP_CONFIG.resilStatus;
-let dcOffRoutine = false;
+let dcRoutineStatus = 'neutral';
 
-function dcSetOffRoutine(isOff) {
-    dcOffRoutine = isOff;
+function dcSetRoutineStatus(status) {
+    dcRoutineStatus = status;
     renderDcColors();
 }
 
@@ -11,15 +11,16 @@ function renderDcColors() {
     const routineContainer = document.getElementById('dcRoutineColors');
     if (routineContainer) {
         const statuses = [
-            { isOff: true, color: '#ffebee', border: '#d32f2f', label: 'Off' },
-            { isOff: false, color: '#e8f5e9', border: '#2e7d32', label: 'On' }
+            { id: 'off', color: '#ffebee', border: '#1a1a1a', label: 'Off', icon: '×' },
+            { id: 'neutral', color: '#f5f5f5', border: '#ddd', label: 'Neutral', icon: '' },
+            { id: 'good', color: '#e8f5e9', border: '#1a1a1a', label: 'Good', icon: 'v' }
         ];
         routineContainer.innerHTML = statuses.map(s => {
-            const isActive = dcOffRoutine === s.isOff;
+            const isActive = dcRoutineStatus === s.id;
             const style = `background: ${s.color}; border: ${isActive ? '1.5px solid #1a1a1a' : '1px solid ' + s.border}; 
-                           width: 24px; height: 24px; cursor: pointer; border-radius: 4px; transition: transform 0.1s;
-                           ${isActive ? 'transform: scale(1.15);' : 'opacity: 0.5;'}`;
-            return `<button type="button" onclick="dcSetOffRoutine(${s.isOff})" style="${style}" title="${s.label} Routine"></button>`;
+                                   width: 28px; height: 28px; cursor: pointer; border-radius: 4px; transition: transform 0.1s;
+                                   ${isActive ? 'transform: scale(1.15);' : 'opacity: 0.5;'} display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: monospace; font-size: 14px;`;
+            return `<button type="button" onclick="dcSetRoutineStatus('${s.id}')" style="${style}" title="${s.label} Routine">${s.icon}</button>`;
         }).join('');
     }
 
@@ -28,17 +29,16 @@ function renderDcColors() {
         intentContainer.innerHTML = CAL_HORIZONS.slice(0, 4).map(h => {
             const isActive = dcIntentHorizon === h.id;
             const style = `background: ${h.color}; border: ${isActive ? '1.5px solid #1a1a1a' : '1px solid #ddd'}; 
-                           width: 20px; height: 20px; cursor: pointer; border-radius: 4px; ${isActive ? 'transform: scale(1.1);' : 'opacity: 0.6;'}`;
+                                   width: 20px; height: 20px; cursor: pointer; border-radius: 4px; ${isActive ? 'transform: scale(1.1);' : 'opacity: 0.6;'}`;
             return `<button type="button" class="cal-h-btn" style="${style}" onclick="dcSetIntent('${h.id}')"></button>`;
         }).join('');
     }
-
     const resilContainer = document.getElementById('dcResilColors');
     if (resilContainer) {
         resilContainer.innerHTML = RESILIENCE_STATUSES.map(s => {
             const isActive = dcResilStatus === s.id;
             const style = `background: ${s.color}; border: ${isActive ? '1.5px solid #1a1a1a' : '1px solid #ddd'}; 
-                           width: 20px; height: 20px; cursor: pointer; border-radius: 4px; ${isActive ? 'transform: scale(1.1);' : 'opacity: 0.6;'}`;
+                                   width: 20px; height: 20px; cursor: pointer; border-radius: 4px; ${isActive ? 'transform: scale(1.1);' : 'opacity: 0.6;'}`;
             return `<button type="button" class="cal-h-btn" style="${style}" onclick="dcSetResil('${s.id}')"></button>`;
         }).join('');
     }
@@ -458,7 +458,7 @@ async function openContextModalForDate(dateStr) {
         const data = await resp.json();
 
         if (data.success) {
-            dcOffRoutine = data.off;
+            dcRoutineStatus = data.routine_status || 'neutral';
             document.getElementById('ctxOffReason').value = data.off_reason;
 
             document.getElementById('bh_hydroxizine').checked = data.bh_hydroxizine;
@@ -492,7 +492,7 @@ async function openContextModalForDate(dateStr) {
 function saveContext() {
     const payload = {
         date: currentContextDate,
-        off_routine: dcOffRoutine,
+        routine_status: dcRoutineStatus,
         off_reason: document.getElementById('ctxOffReason').value,
         bh_hydroxizine: document.getElementById('bh_hydroxizine').checked,
         bh_ritalin: document.getElementById('bh_ritalin').checked,
@@ -661,7 +661,7 @@ function toggleMobileView() {
 
 function toggleChildren(parentId, btnElement = null, forceState = null) {
     const childrenCells = document.querySelectorAll(`.habit-cell[data-parent-id="${parentId}"]`);
-    
+
     const childIndices = new Set();
     childrenCells.forEach(cell => childIndices.add(cell.getAttribute('data-idx')));
 
@@ -811,7 +811,7 @@ let focusModeActive = false;
 
 function toggleFocusMode() {
     focusModeActive = !focusModeActive;
-    
+
     const btn = document.getElementById('focusBtn');
     if (btn) btn.classList.toggle('black', focusModeActive);
 
@@ -913,4 +913,41 @@ function toggleEditCollapsedVisibility() {
     } else {
         container.style.display = 'block';
     }
+}
+function saveWeekToggle(weekId, field, value) {
+    fetch('/api/update_week_toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ week_id: weekId, [field]: value })
+    }).then(r => r.json()).then(d => {
+        if (d.success) {
+            location.reload();
+        }
+    });
+}
+
+function toggleWeekSummary(btn, weekId) {
+    let currentText = btn.innerText.trim();
+    let newStatus = currentText === 'OK' ? 'NOT OK' : 'OK';
+
+    fetch('/api/update_week_toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ week_id: weekId, summary_status: newStatus })
+    }).then(r => r.json()).then(d => {
+        if (d.success) {
+            btn.innerText = newStatus;
+            if (newStatus === 'NOT OK') {
+                btn.style.backgroundColor = '#ffebee';
+                btn.style.color = '#d32f2f';
+                btn.style.borderColor = '#d32f2f';
+            } else {
+                btn.style.backgroundColor = '#f5f5f5';
+                btn.style.color = '#1a1a1a';
+                btn.style.borderColor = '#ddd';
+            }
+        } else {
+            console.error("Error saving status:", d.error);
+        }
+    });
 }
