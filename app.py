@@ -1036,10 +1036,11 @@ def index():
         for c in recent_cals:
             lines = [line for line in c.comments.split("\n") if line.strip()]
             current_comment = None
+            day_comments = []
             for line in lines:
                 if line.startswith("[") and "]" in line:
                     if current_comment:
-                        global_parsed_comments.append(current_comment)
+                        day_comments.append(current_comment)
                     idx = line.find("]")
                     current_comment = {
                         "date": c.actual_date.strftime("%Y-%m-%d"),
@@ -1049,8 +1050,10 @@ def index():
                 elif current_comment:
                     current_comment["text"] += "\n" + line
             if current_comment:
-                global_parsed_comments.append(current_comment)
-        global_parsed_comments.reverse()
+                day_comments.append(current_comment)
+            
+            day_comments.reverse() 
+            global_parsed_comments.extend(day_comments)
 
         intent_today = IntentEntry.query.filter_by(entry_date=today).first()
         resil_today = ResilienceEntry.query.filter_by(entry_date=today).first()
