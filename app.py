@@ -1656,6 +1656,41 @@ def save_calendar_data(cal_type):
     db.session.commit()
     return jsonify({"success": True})
 
+@app.route("/api/bot/get_pending_habits", methods=["POST"])
+@login_required
+def bot_get_pending_habits():
+    today = datetime.datetime.now(ZoneInfo("America/Chicago")).date()
+    all_active = Thread.query.filter_by(status="active").all()
+    
+    pending = []
+    for th in all_active:
+        is_padding = False
+        if th.cadence and th.cadence != "daily":
+            try:
+                sched = [int(x) for x in th.cadence.split(",") if x.isdigit()]
+                if sched and today.weekday() not in sched:
+                    is_padding = True
+            except:
+                pass
+        
+        if is_padding:
+            continue
+            
+        sq_id = f"{th.thread_id}_{today.strftime('%Y-%m-%d')}"
+        sq = db.session.get(Square, sq_id)
+        
+        if not sq or sq.status == "empty":
+            pending.append({
+                "thread_id": th.thread_id,
+                "name": th.thread_name
+            })
+            
+    return jsonify({
+        "success": True, 
+        "date": today.strftime('%Y-%m-%d'), 
+        "habits": pending
+    })
+
 
 @app.route("/api/aggregate/<int:year>", methods=["GET"])
 @login_required
