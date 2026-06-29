@@ -1733,45 +1733,6 @@ def get_aggregate_data(year):
     data["intentionality"] = intent_data
 
     return jsonify({"success": True, "data": data, "year": year})
-
-@app.route("/api/trmnl_data", methods=["GET"])
-def trmnl_data():
-    token = request.headers.get("Authorization")
-    if token != f"Bearer {HASH_WEB}":
-        return jsonify({"error": "Unauthorized"}), 401
-
-    today = datetime.datetime.now(ZoneInfo("America/Chicago")).date()
-    
-    all_active = Thread.query.filter_by(status="active").all()
-    pending = []
-    for th in all_active:
-        is_padding = False
-        if th.cadence and th.cadence != "daily":
-            try:
-                sched = [int(x) for x in th.cadence.split(",") if x.isdigit()]
-                if sched and today.weekday() not in sched:
-                    is_padding = True
-            except:
-                pass
-        
-        if is_padding:
-            continue
-            
-        sq_id = f"{th.thread_id}_{today.strftime('%Y-%m-%d')}"
-        sq = db.session.get(Square, sq_id)
-        
-        if not sq or sq.status == "empty":
-            pending.append({"name": th.thread_name})
-            
-    intent = IntentEntry.query.filter_by(entry_date=today).first()
-    resil = ResilienceEntry.query.filter_by(entry_date=today).first()
-    
-    return jsonify({
-        "date": today.strftime('%Y-%m-%d'),
-        "pending_habits": pending,
-        "intent_horizon": intent.horizon if intent else "survival",
-        "resil_status": resil.status if resil else "baseline"
-    }) 
     
 @app.route("/api/delete_log", methods=["POST"])
 @login_required
