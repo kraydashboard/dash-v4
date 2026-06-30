@@ -864,108 +864,46 @@ if request_bot:
         except Exception as e:
             request_bot.reply_to(message, f"Error: {e}")
 
+    # Встав своє посилання на Webhook з панелі TRMNL
+    TRMNL_WEBHOOK_URL = os.environ.get("TRMNL_WEBHOOK_URL", "https://trmnl.com/api/custom_plugins/134e7725-266c-433c-bda8-90405ac72a59")
+
     @request_bot.message_handler(commands=["todo"])
-    def handle_todo(message):
+    def handle_trmnl_todo(message):
         with app.app_context():
-            # Доступ дозволено для обох ролей
+            # Перевіряємо, чи має юзер доступ
             user = db.session.get(BotUser, message.chat.id)
             if not user or user.role not in ["admin", "user"]:
-                request_bot.reply_to(message, "⛔️ Access denied. Please authenticate with your secret password first.")
+                request_bot.reply_to(message, "⛔️ Access denied. Please authenticate first.")
                 return
 
-            today = datetime.datetime.now(ZoneInfo("America/Chicago")).date()
-            all_active = Thread.query.filter_by(status="active").all()
-            
-            markup = InlineKeyboardMarkup(row_width=1)
-            pending_count = 0
-            
-            for th in all_active:
-                is_padding = False
-                if th.cadence and th.cadence != "daily":
-                    try:
-                        sched = [int(x) for x in th.cadence.split(",") if x.isdigit()]
-                        if sched and today.weekday() not in sched:
-                            is_padding = True
-                    except:
-                        pass
-                
-                if is_padding:
-                    continue
-                    
-                sq_id = f"{th.thread_id}_{today.strftime('%Y-%m-%d')}"
-                sq = db.session.get(Square, sq_id)
-                
-                # Додаємо лише невиконані задачі
-                if not sq or sq.status == "empty":
-                    btn = InlineKeyboardButton(text=f"⬜️ {th.thread_name}", callback_data=f"hit_{th.thread_id}")
-                    markup.add(btn)
-                    pending_count += 1
-            
-            if pending_count == 0:
-                request_bot.reply_to(message, "🎉 All tasks for today are completed!")
-            else:
-                request_bot.reply_to(message, f"📌 You have {pending_count} pending tasks for today:", reply_markup=markup)
+            # Відрізаємо саму команду "/todo " і беремо лише текст після неї
+            text = message.text[len("/todo"):].strip()
 
-    @request_bot.callback_query_handler(func=lambda call: call.data.startswith('hit_'))
-    def handle_habit_hit(call):
-        thread_id = int(call.data.split('_')[1])
-        
-        with app.app_context():
-            # Перевірка доступу для натискання кнопок
-            user = db.session.get(BotUser, call.message.chat.id)
-            if not user or user.role not in ["admin", "user"]:
-                request_bot.answer_callback_query(call.id, "Access denied.")
+            # Якщо юзер надіслав просто /todo без тексту
+            if not text:
+                request_bot.reply_to(
+                    message, 
+                    "Введіть список справ після команди. Наприклад:\n\n/todo \n[ ] Зробити бекап\n[x] Випити кави\n[ ] Налаштувати сервер"
+                )
                 return
-            
-            today = datetime.datetime.now(ZoneInfo("America/Chicago")).date()
-            d_str = today.strftime('%Y-%m-%d')
-            sq_id = f"{thread_id}_{d_str}"
-            
-            sq = db.session.get(Square, sq_id)
-            if not sq:
-                sq = Square(square_id=sq_id, thread_id=thread_id, period=today)
-                db.session.add(sq)
-            
-            if sq.status == "hit":
-                request_bot.answer_callback_query(call.id, "Already completed!")
-            else:
-                sq.status = "hit"
-                db.session.commit()
-                recalculate_chains(thread_id)
-                request_bot.answer_callback_query(call.id, "✅ Completed!")
-            
-            # Оновлюємо клавіатуру, щоб виконана задача зникла
-            all_active = Thread.query.filter_by(status="active").all()
-            markup = InlineKeyboardMarkup(row_width=1)
-            pending_count = 0
-            
-            for th in all_active:
-                is_padding = False
-                if th.cadence and th.cadence != "daily":
-                    try:
-                        sched = [int(x) for x in th.cadence.split(",") if x.isdigit()]
-                        if sched and today.weekday() not in sched:
-                            is_padding = True
-                    except:
-                        pass
-                if is_padding: continue
-                    
-                current_sq_id = f"{th.thread_id}_{d_str}"
-                current_sq = db.session.get(Square, current_sq_id)
+
+            # Формуємо JSON для TRMNL (змінна "note", яку ми прописали в розмітці)
+            payload = {
+                "merge_variables": {
+                    "note": text
+                }
+            }
+
+            try:
+                # Відправляємо дані на екран
+                response = requests.post(TRMNL_WEBHOOK_URL, json=payload)
                 
-                if not current_sq or current_sq.status == "empty":
-                    btn = InlineKeyboardButton(text=f"⬜️ {th.thread_name}", callback_data=f"hit_{th.thread_id}")
-                    markup.add(btn)
-                    pending_count += 1
-                    
-            if pending_count == 0:
-                request_bot.edit_message_text("🎉 All tasks for today are completed!", 
-                                              chat_id=call.message.chat.id, 
-                                              message_id=call.message.message_id)
-            else:
-                request_bot.edit_message_reply_markup(chat_id=call.message.chat.id, 
-                                                      message_id=call.message.message_id, 
-                                                      reply_markup=markup)
+                if response.status_code == 200:
+                    request_bot.reply_to(message, "✅ Список успішно відправлено на екран TRMNL!")
+                else:
+                    request_bot.reply_to(message, f"❌ Помилка від TRMNL: {response.status_code} - {response.text}")
+            except Exception as e:
+                request_bot.reply_to(message, f"❌ Помилка з'єднання: {e}")
                 
     @request_bot.message_handler(func=lambda message: True)
     def handle_all_text(message):
