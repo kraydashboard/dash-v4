@@ -733,82 +733,114 @@ def send_scheduled_backup():
 # --- REQUEST BOT LOGIC ---
 if request_bot:
 
-    @request_bot.message_handler(commands=["start", "help"])
-    def req_send_welcome(message):
-        request_bot.reply_to(
-            message,
-            "Hello! Write your requests here. \n\nTo get all requests as a list, type /list\nTo clear the list, type /clear\n\n(Enter password for Admin Mode)",
-        )
+    def get_main_menu(role="user"):
+        """Generates an inline keyboard based on user role"""
+        markup = InlineKeyboardMarkup(row_width=2)
+        btns = [
+            InlineKeyboardButton("📝 List Requests", callback_data="btn_list"),
+            InlineKeyboardButton("✅ Send Todo", callback_data="btn_todo")
+        ]
+        if role == "admin":
+            btns.extend([
+                InlineKeyboardButton("🗑 Clear Requests", callback_data="btn_clear"),
+                InlineKeyboardButton("📦 Backup JSON", callback_data="btn_backup"),
+                InlineKeyboardButton("🗄 Get DB", callback_data="btn_getdb")
+            ])
+        markup.add(*btns)
+        markup.add(InlineKeyboardButton("🚪 Logout", callback_data="btn_logout"))
+        return markup
 
-    @request_bot.message_handler(commands=["logout"])
-    def handle_logout(message):
+    @request_bot.message_handler(commands=["start", "help", "menu"])
+    def req_send_welcome(message):
         with app.app_context():
             user = db.session.get(BotUser, message.chat.id)
             if user:
-                db.session.delete(user)
-                db.session.commit()
-                request_bot.reply_to(message, "ok")
+                request_bot.reply_to(
+                    message,
+                    f"👋 Welcome! Your access level is: {user.role}. Choose an action below:",
+                    reply_markup=get_main_menu(user.role)
+                )
+            else:
+                request_bot.reply_to(
+                    message,
+                    "Hello! Please send your password to authenticate (Admin or User Mode)."
+                )
 
-    @request_bot.message_handler(commands=["list"])
-    def req_list_requests(message):
+    @request_bot.callback_query_handler(func=lambda call: True)
+    def handle_query(call):
+        chat_id = call.message.chat.id
         with app.app_context():
-            reqs = PartnerRequest.query.order_by(PartnerRequest.id.asc()).all()
-            if not reqs:
-                request_bot.reply_to(message, "📭 The request list is currently empty.")
+            user = db.session.get(BotUser, chat_id)
+            if not user:
+                request_bot.answer_callback_query(call.id, "⛔️ Access denied. Please send your password.")
                 return
 
-            msg = "📝 <b>List of requests:</b>\n\n"
-            for i, r in enumerate(reqs, 1):
-                msg += f"{i}. {r.text}\n"
+            action = call.data
 
-            request_bot.reply_to(message, msg, parse_mode="HTML")
+            if action == "btn_list":
+                reqs = PartnerRequest.query.order_by(PartnerRequest.id.asc()).all()
+                if not reqs:
+                    request_bot.send_message(chat_id, "📭 The request list is currently empty.")
+                else:
+                    msg = "📝 <b>List of requests:</b>\n\n"
+                    for i, r in enumerate(reqs, 1):
+                        msg += f"{i}. {r.text}\n"
+                    request_bot.send_message(chat_id, msg, parse_mode="HTML")
 
-    @request_bot.message_handler(commands=["clear"])
-    def req_clear_requests(message):
-        with app.app_context():
-            PartnerRequest.query.delete()
-            db.session.commit()
-            request_bot.reply_to(message, "🗑 The list has been successfully cleared.")
+            elif action == "btn_clear" and user.role == "admin":
+                PartnerRequest.query.delete()
+                db.session.commit()
+                request_bot.send_message(chat_id, "🗑 The list has been successfully cleared.")
 
-    @request_bot.message_handler(commands=["backup"])
-    def handle_backup(message):
-        with app.app_context():
-            user = db.session.get(BotUser, message.chat.id)
-            if user and user.role == "admin":
+            elif action == "btn_backup" and user.role == "admin":
+                request_bot.send_message(chat_id, "⏳ Preparing backup...")
                 send_scheduled_backup()
-            else:
-                request_bot.reply_to(message, "bro, where is json")
 
-    @request_bot.message_handler(commands=["getdb"])
-    def handle_getdb(message):
-        with app.app_context():
-            user = db.session.get(BotUser, message.chat.id)
-            if user and user.role == "admin":
+            elif action == "btn_getdb" and user.role == "admin":
                 db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
-
                 if db_uri.startswith("sqlite:////data/"):
                     db_path = db_uri.replace("sqlite:///", "")
-
                     if os.path.exists(db_path):
-                        request_bot.reply_to(message, "⏳ Uploading database file...")
+                        request_bot.send_message(chat_id, "⏳ Uploading database file...")
                         with open(db_path, "rb") as f:
                             request_bot.send_document(
-                                message.chat.id,
-                                f,
+                                chat_id, f,
                                 visible_file_name="Life_tracker.db",
-                                caption="📦 Original SQLite database file (from /data/ volume)",
+                                caption="📦 Original SQLite database file"
                             )
                     else:
-                        request_bot.reply_to(
-                            message, "❌ Database file not found in /data/."
-                        )
+                        request_bot.send_message(chat_id, "❌ Database file not found in /data/.")
                 else:
-                    request_bot.reply_to(
-                        message,
-                        "❌ This feature is ONLY available when the database is located in the /data/ volume (on the server).",
-                    )
+                    request_bot.send_message(chat_id, "❌ Feature ONLY available for /data/ volume DBs.")
+
+            elif action == "btn_todo":
+                msg = request_bot.send_message(chat_id, "📝 Send the to-do list (each item on a new line) for the TRMNL screen:")
+                request_bot.register_next_step_handler(msg, process_todo_step, user.role)
+
+            elif action == "btn_logout":
+                db.session.delete(user)
+                db.session.commit()
+                request_bot.send_message(chat_id, "🚪 Logged out successfully. Send your password to log in again.")
+
+            request_bot.answer_callback_query(call.id)
+
+    def process_todo_step(message, role):
+        if message.text and message.text.startswith('/'):
+            handle_all_text(message)
+            return
+            
+        text = message.text.strip()
+        TRMNL_WEBHOOK_URL = os.environ.get("TRMNL_WEBHOOK_URL", "https://trmnl.com/api/custom_plugins/134e7725-266c-433c-bda8-90405ac72a59")
+        payload = {"merge_variables": {"note": text}}
+
+        try:
+            response = requests.post(TRMNL_WEBHOOK_URL, json=payload)
+            if response.status_code == 200:
+                request_bot.reply_to(message, "✅ List successfully sent to the TRMNL screen!")
             else:
-                request_bot.reply_to(message, "bro, who are you?")
+                request_bot.reply_to(message, f"❌ TRMNL Error: {response.status_code} - {response.text}")
+        except Exception as e:
+            request_bot.reply_to(message, f"❌ Connection error: {e}")
 
     @request_bot.message_handler(content_types=["document"])
     def handle_docs(message):
@@ -823,7 +855,7 @@ if request_bot:
             downloaded_file = request_bot.download_file(file_info.file_path)
 
             if file_name.endswith(".json"):
-                request_bot.reply_to(message, "⏳ restoring from json...")
+                request_bot.reply_to(message, "⏳ Restoring from JSON...")
                 json_content = downloaded_file.decode("utf-8")
                 with app.app_context():
                     success, msg = restore_from_json(json_content)
@@ -834,77 +866,21 @@ if request_bot:
 
             elif file_name.endswith(".db"):
                 db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
-
                 if db_uri.startswith("sqlite:////data/"):
                     db_path = db_uri.replace("sqlite:///", "")
-
-                    request_bot.reply_to(
-                        message, "⏳ Replacing database file in /data/..."
-                    )
-
+                    request_bot.reply_to(message, "⏳ Replacing database file in /data/...")
                     with app.app_context():
                         db.engine.dispose()
-
                         with open(db_path, "wb") as f:
                             f.write(downloaded_file)
-
-                    request_bot.reply_to(
-                        message,
-                        "✅ SQLite database in /data/ successfully replaced! Changes will take effect on the next request.",
-                    )
+                    request_bot.reply_to(message, "✅ SQLite database successfully replaced! Changes will take effect on the next request.")
                 else:
-                    request_bot.reply_to(
-                        message,
-                        "❌ Replacing the .db file is ONLY allowed if the app is running on a server with a /data/ volume.",
-                    )
-
+                    request_bot.reply_to(message, "❌ Replacing the .db file is ONLY allowed if the app is running on a server with a /data/ volume.")
             else:
                 request_bot.reply_to(message, "❌ Please send me a .json or .db file.")
-
         except Exception as e:
             request_bot.reply_to(message, f"Error: {e}")
 
-    # Встав своє посилання на Webhook з панелі TRMNL
-    TRMNL_WEBHOOK_URL = os.environ.get("TRMNL_WEBHOOK_URL", "https://trmnl.com/api/custom_plugins/134e7725-266c-433c-bda8-90405ac72a59")
-
-    @request_bot.message_handler(commands=["todo"])
-    def handle_trmnl_todo(message):
-        with app.app_context():
-            # Перевіряємо, чи має юзер доступ
-            user = db.session.get(BotUser, message.chat.id)
-            if not user or user.role not in ["admin", "user"]:
-                request_bot.reply_to(message, "⛔️ Access denied. Please authenticate first.")
-                return
-
-            # Відрізаємо саму команду "/todo " і беремо лише текст після неї
-            text = message.text[len("/todo"):].strip()
-
-            # Якщо юзер надіслав просто /todo без тексту
-            if not text:
-                request_bot.reply_to(
-                    message, 
-                    "Введіть список справ після команди. Наприклад:\n\n/todo \n[ ] Зробити бекап\n[x] Випити кави\n[ ] Налаштувати сервер"
-                )
-                return
-
-            # Формуємо JSON для TRMNL (змінна "note", яку ми прописали в розмітці)
-            payload = {
-                "merge_variables": {
-                    "note": text
-                }
-            }
-
-            try:
-                # Відправляємо дані на екран
-                response = requests.post(TRMNL_WEBHOOK_URL, json=payload)
-                
-                if response.status_code == 200:
-                    request_bot.reply_to(message, "✅ Список успішно відправлено на екран TRMNL!")
-                else:
-                    request_bot.reply_to(message, f"❌ Помилка від TRMNL: {response.status_code} - {response.text}")
-            except Exception as e:
-                request_bot.reply_to(message, f"❌ Помилка з'єднання: {e}")
-                
     @request_bot.message_handler(func=lambda message: True)
     def handle_all_text(message):
         chat_id = message.chat.id
@@ -918,7 +894,7 @@ if request_bot:
                 if not user:
                     db.session.add(BotUser(chat_id=chat_id, role="admin"))
                     db.session.commit()
-                request_bot.reply_to(message, "👨‍💻 Admin Mode authenticated.")
+                request_bot.reply_to(message, "👨‍💻 Admin Mode authenticated. Here is your menu:", reply_markup=get_main_menu("admin"))
                 return
                 
             elif pwd_hash == HASH_USER:
@@ -926,14 +902,17 @@ if request_bot:
                 if not user:
                     db.session.add(BotUser(chat_id=chat_id, role="user"))
                     db.session.commit()
-                request_bot.reply_to(message, "👤 User Mode authenticated. You can now use /todo.")
+                request_bot.reply_to(message, "👤 User Mode authenticated. Here is your menu:", reply_markup=get_main_menu("user"))
                 return
 
-            new_req = PartnerRequest(text=txt)
-            db.session.add(new_req)
-            db.session.commit()
-
-        request_bot.reply_to(message, "✅ Added to the list!")
+            user = db.session.get(BotUser, chat_id)
+            if user:
+                new_req = PartnerRequest(text=txt)
+                db.session.add(new_req)
+                db.session.commit()
+                request_bot.reply_to(message, "✅ Added to the list!")
+            else:
+                request_bot.reply_to(message, "⛔️ Unknown user. Please send your password.")
 
 
 def run_request_bot_thread():
