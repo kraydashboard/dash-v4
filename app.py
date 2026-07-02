@@ -67,7 +67,12 @@ if REQUEST_BOT_TOKEN:
 
 # --- MODELS ---
 
-
+class TrmnlTodo(db.Model):
+    __tablename__ = "trmnl_todos"
+    id = db.Column(db.Integer, primary_key=True)
+    text = db.Column(db.Text, nullable=False)
+    is_done = db.Column(db.Boolean, default=False)
+    
 class BotUser(db.Model):
     __tablename__ = "bot_users"
     chat_id = db.Column(db.BigInteger, primary_key=True)
@@ -733,23 +738,60 @@ def send_scheduled_backup():
 # --- REQUEST BOT LOGIC ---
 if request_bot:
 
+    # --- MENU GENERATORS ---
     def get_main_menu(role="user"):
-        """Generates an inline keyboard based on user role"""
         markup = InlineKeyboardMarkup(row_width=2)
-        btns = [
-            InlineKeyboardButton("📝 List Requests", callback_data="btn_list"),
-            InlineKeyboardButton("✅ Send Todo", callback_data="btn_todo")
-        ]
+        markup.add(
+            InlineKeyboardButton("📝 Requests", callback_data="menu_req"),
+            InlineKeyboardButton("📋 TRMNL To-Do", callback_data="menu_todo")
+        )
         if role == "admin":
-            btns.extend([
-                InlineKeyboardButton("🗑 Clear Requests", callback_data="btn_clear"),
+            markup.add(
                 InlineKeyboardButton("📦 Backup JSON", callback_data="btn_backup"),
                 InlineKeyboardButton("🗄 Get DB", callback_data="btn_getdb")
-            ])
-        markup.add(*btns)
+            )
         markup.add(InlineKeyboardButton("🚪 Logout", callback_data="btn_logout"))
         return markup
 
+    def get_req_menu(role):
+        markup = InlineKeyboardMarkup(row_width=2)
+        markup.add(
+            InlineKeyboardButton("👁 View", callback_data="req_list"),
+            InlineKeyboardButton("➕ Add", callback_data="req_add"),
+            InlineKeyboardButton("🗑 Delete Item", callback_data="req_del_menu")
+        )
+        if role == "admin":
+            markup.add(InlineKeyboardButton("💣 Clear All", callback_data="req_clear"))
+        markup.add(InlineKeyboardButton("🔙 Back", callback_data="menu_main"))
+        return markup
+
+    def get_todo_menu():
+        markup = InlineKeyboardMarkup(row_width=2)
+        markup.add(
+            InlineKeyboardButton("➕ Add Task", callback_data="todo_add"),
+            InlineKeyboardButton("✅/⬜️ Toggle Status", callback_data="todo_toggle_menu"),
+            InlineKeyboardButton("🗑 Delete Task", callback_data="todo_del_menu"),
+            InlineKeyboardButton("📤 Send to TRMNL", callback_data="todo_send")
+        )
+        markup.add(InlineKeyboardButton("🔙 Back", callback_data="menu_main"))
+        return markup
+
+    def get_items_list_menu(model, callback_prefix, back_callback, is_todo=False):
+        """Universal generator for lists with toggle/delete actions"""
+        markup = InlineKeyboardMarkup(row_width=1)
+        items = model.query.all()
+        for i in items:
+            if is_todo:
+                icon = "✅" if getattr(i, 'is_done', False) else "⬜️"
+                text = f"{icon} {i.text}"
+            else:
+                text = f"🗑 {i.text}"
+            markup.add(InlineKeyboardButton(text[:40], callback_data=f"{callback_prefix}_{i.id}"))
+        markup.add(InlineKeyboardButton("🔙 Back", callback_data=back_callback))
+        return markup
+
+
+    # --- HANDLERS ---
     @request_bot.message_handler(commands=["start", "help", "menu"])
     def req_send_welcome(message):
         with app.app_context():
@@ -757,14 +799,11 @@ if request_bot:
             if user:
                 request_bot.reply_to(
                     message,
-                    f"👋 Welcome! Your access level is: {user.role}. Choose an action below:",
+                    f"👋 Welcome! Access level: {user.role}.",
                     reply_markup=get_main_menu(user.role)
                 )
             else:
-                request_bot.reply_to(
-                    message,
-                    "Hello! Please send your password to authenticate (Admin or User Mode)."
-                )
+                request_bot.reply_to(message, "Hello! Please send your password to authenticate.")
 
     @request_bot.callback_query_handler(func=lambda call: True)
     def handle_query(call):
@@ -772,26 +811,104 @@ if request_bot:
         with app.app_context():
             user = db.session.get(BotUser, chat_id)
             if not user:
-                request_bot.answer_callback_query(call.id, "⛔️ Access denied. Please send your password.")
+                request_bot.answer_callback_query(call.id, "⛔️ Access denied.")
                 return
 
             action = call.data
 
-            if action == "btn_list":
+            # --- NAVIGATION ---
+            if action == "menu_main":
+                request_bot.edit_message_text("Main Menu:", chat_id, call.message.message_id, reply_markup=get_main_menu(user.role))
+            elif action == "menu_req":
+                request_bot.edit_message_text("📝 Requests Management:", chat_id, call.message.message_id, reply_markup=get_req_menu(user.role))
+            elif action == "menu_todo":
+                request_bot.edit_message_text("📋 To-Do Management:", chat_id, call.message.message_id, reply_markup=get_todo_menu())
+
+            # --- REQUESTS LOGIC ---
+            elif action == "req_list":
                 reqs = PartnerRequest.query.order_by(PartnerRequest.id.asc()).all()
                 if not reqs:
-                    request_bot.send_message(chat_id, "📭 The request list is currently empty.")
+                    request_bot.send_message(chat_id, "📭 The request list is empty.")
                 else:
                     msg = "📝 <b>List of requests:</b>\n\n"
                     for i, r in enumerate(reqs, 1):
                         msg += f"{i}. {r.text}\n"
                     request_bot.send_message(chat_id, msg, parse_mode="HTML")
+            
+            elif action == "req_add":
+                msg = request_bot.send_message(chat_id, "Type the request you want to add:")
+                request_bot.register_next_step_handler(msg, process_add_req, user.role)
 
-            elif action == "btn_clear" and user.role == "admin":
+            elif action == "req_del_menu":
+                markup = get_items_list_menu(PartnerRequest, "req_del", "menu_req")
+                request_bot.edit_message_text("Select a request to delete:", chat_id, call.message.message_id, reply_markup=markup)
+
+            elif action.startswith("req_del_"):
+                item_id = int(action.split("_")[2])
+                item = db.session.get(PartnerRequest, item_id)
+                if item:
+                    db.session.delete(item)
+                    db.session.commit()
+                markup = get_items_list_menu(PartnerRequest, "req_del", "menu_req")
+                request_bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=markup)
+
+            elif action == "req_clear" and user.role == "admin":
                 PartnerRequest.query.delete()
                 db.session.commit()
-                request_bot.send_message(chat_id, "🗑 The list has been successfully cleared.")
+                request_bot.send_message(chat_id, "🗑 The request list has been cleared.")
 
+            # --- TO-DO LOGIC ---
+            elif action == "todo_add":
+                msg = request_bot.send_message(chat_id, "Type new tasks (each on a new line):")
+                request_bot.register_next_step_handler(msg, process_add_todo)
+
+            elif action == "todo_toggle_menu":
+                markup = get_items_list_menu(TrmnlTodo, "todo_tgl", "menu_todo", is_todo=True)
+                request_bot.edit_message_text("Click to toggle status:", chat_id, call.message.message_id, reply_markup=markup)
+
+            elif action.startswith("todo_tgl_"):
+                item_id = int(action.split("_")[2])
+                item = db.session.get(TrmnlTodo, item_id)
+                if item:
+                    item.is_done = not item.is_done
+                    db.session.commit()
+                markup = get_items_list_menu(TrmnlTodo, "todo_tgl", "menu_todo", is_todo=True)
+                request_bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=markup)
+
+            elif action == "todo_del_menu":
+                markup = get_items_list_menu(TrmnlTodo, "todo_del", "menu_todo", is_todo=True)
+                request_bot.edit_message_text("Select a task to delete:", chat_id, call.message.message_id, reply_markup=markup)
+
+            elif action.startswith("todo_del_"):
+                item_id = int(action.split("_")[2])
+                item = db.session.get(TrmnlTodo, item_id)
+                if item:
+                    db.session.delete(item)
+                    db.session.commit()
+                markup = get_items_list_menu(TrmnlTodo, "todo_del", "menu_todo", is_todo=True)
+                request_bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=markup)
+
+            elif action == "todo_send":
+                todos = TrmnlTodo.query.all()
+                lines = []
+                for t in todos:
+                    box = "[x]" if t.is_done else "[ ]"
+                    lines.append(f"{box} {t.text}")
+                
+                text = "\n".join(lines) if lines else "No tasks available"
+                TRMNL_WEBHOOK_URL = os.environ.get("TRMNL_WEBHOOK_URL", "https://trmnl.com/api/custom_plugins/134e7725-266c-433c-bda8-90405ac72a59")
+                payload = {"merge_variables": {"note": text}}
+
+                try:
+                    response = requests.post(TRMNL_WEBHOOK_URL, json=payload)
+                    if response.status_code == 200:
+                        request_bot.send_message(chat_id, f"✅ Sent to TRMNL:\n\n{text}")
+                    else:
+                        request_bot.send_message(chat_id, f"❌ TRMNL Error: {response.status_code} - {response.text}")
+                except Exception as e:
+                    request_bot.send_message(chat_id, f"❌ Connection error: {e}")
+
+            # --- SYSTEM LOGIC ---
             elif action == "btn_backup" and user.role == "admin":
                 request_bot.send_message(chat_id, "⏳ Preparing backup...")
                 send_scheduled_backup()
@@ -803,45 +920,41 @@ if request_bot:
                     if os.path.exists(db_path):
                         request_bot.send_message(chat_id, "⏳ Uploading database file...")
                         with open(db_path, "rb") as f:
-                            request_bot.send_document(
-                                chat_id, f,
-                                visible_file_name="Life_tracker.db",
-                                caption="📦 Original SQLite database file"
-                            )
+                            request_bot.send_document(chat_id, f, visible_file_name="Life_tracker.db")
                     else:
-                        request_bot.send_message(chat_id, "❌ Database file not found in /data/.")
+                        request_bot.send_message(chat_id, "❌ DB not found in /data/.")
                 else:
-                    request_bot.send_message(chat_id, "❌ Feature ONLY available for /data/ volume DBs.")
-
-            elif action == "btn_todo":
-                msg = request_bot.send_message(chat_id, "📝 Send the to-do list (each item on a new line) for the TRMNL screen:")
-                request_bot.register_next_step_handler(msg, process_todo_step, user.role)
+                    request_bot.send_message(chat_id, "❌ Available only for /data/ volume DBs.")
 
             elif action == "btn_logout":
                 db.session.delete(user)
                 db.session.commit()
-                request_bot.send_message(chat_id, "🚪 Logged out successfully. Send your password to log in again.")
+                request_bot.send_message(chat_id, "🚪 Logged out. Send password to login.")
 
             request_bot.answer_callback_query(call.id)
 
-    def process_todo_step(message, role):
+    # --- NEXT STEP HANDLERS ---
+    def process_add_req(message, role):
         if message.text and message.text.startswith('/'):
             handle_all_text(message)
             return
-            
-        text = message.text.strip()
-        TRMNL_WEBHOOK_URL = os.environ.get("TRMNL_WEBHOOK_URL", "https://trmnl.com/api/custom_plugins/134e7725-266c-433c-bda8-90405ac72a59")
-        payload = {"merge_variables": {"note": text}}
+        with app.app_context():
+            db.session.add(PartnerRequest(text=message.text.strip()))
+            db.session.commit()
+        request_bot.reply_to(message, "✅ Request added.", reply_markup=get_req_menu(role))
 
-        try:
-            response = requests.post(TRMNL_WEBHOOK_URL, json=payload)
-            if response.status_code == 200:
-                request_bot.reply_to(message, "✅ List successfully sent to the TRMNL screen!")
-            else:
-                request_bot.reply_to(message, f"❌ TRMNL Error: {response.status_code} - {response.text}")
-        except Exception as e:
-            request_bot.reply_to(message, f"❌ Connection error: {e}")
+    def process_add_todo(message):
+        if message.text and message.text.startswith('/'):
+            handle_all_text(message)
+            return
+        lines = [line.strip() for line in message.text.split('\n') if line.strip()]
+        with app.app_context():
+            for line in lines:
+                db.session.add(TrmnlTodo(text=line))
+            db.session.commit()
+        request_bot.reply_to(message, f"✅ Added {len(lines)} task(s).", reply_markup=get_todo_menu())
 
+    # --- FILE UPLOADS & TEXT CATCH-ALL ---
     @request_bot.message_handler(content_types=["document"])
     def handle_docs(message):
         with app.app_context():
@@ -859,25 +972,20 @@ if request_bot:
                 json_content = downloaded_file.decode("utf-8")
                 with app.app_context():
                     success, msg = restore_from_json(json_content)
-                if success:
-                    request_bot.reply_to(message, "✅ Success.")
-                else:
-                    request_bot.reply_to(message, f"❌ Error: {msg}")
+                request_bot.reply_to(message, "✅ Success." if success else f"❌ Error: {msg}")
 
             elif file_name.endswith(".db"):
                 db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
                 if db_uri.startswith("sqlite:////data/"):
                     db_path = db_uri.replace("sqlite:///", "")
-                    request_bot.reply_to(message, "⏳ Replacing database file in /data/...")
+                    request_bot.reply_to(message, "⏳ Replacing DB...")
                     with app.app_context():
                         db.engine.dispose()
                         with open(db_path, "wb") as f:
                             f.write(downloaded_file)
-                    request_bot.reply_to(message, "✅ SQLite database successfully replaced! Changes will take effect on the next request.")
+                    request_bot.reply_to(message, "✅ DB replaced! Changes apply next request.")
                 else:
-                    request_bot.reply_to(message, "❌ Replacing the .db file is ONLY allowed if the app is running on a server with a /data/ volume.")
-            else:
-                request_bot.reply_to(message, "❌ Please send me a .json or .db file.")
+                    request_bot.reply_to(message, "❌ Not allowed unless using /data/ volume.")
         except Exception as e:
             request_bot.reply_to(message, f"Error: {e}")
 
@@ -894,7 +1002,7 @@ if request_bot:
                 if not user:
                     db.session.add(BotUser(chat_id=chat_id, role="admin"))
                     db.session.commit()
-                request_bot.reply_to(message, "👨‍💻 Admin Mode authenticated. Here is your menu:", reply_markup=get_main_menu("admin"))
+                request_bot.reply_to(message, "👨‍💻 Admin Mode authenticated.", reply_markup=get_main_menu("admin"))
                 return
                 
             elif pwd_hash == HASH_USER:
@@ -902,17 +1010,17 @@ if request_bot:
                 if not user:
                     db.session.add(BotUser(chat_id=chat_id, role="user"))
                     db.session.commit()
-                request_bot.reply_to(message, "👤 User Mode authenticated. Here is your menu:", reply_markup=get_main_menu("user"))
+                request_bot.reply_to(message, "👤 User Mode authenticated.", reply_markup=get_main_menu("user"))
                 return
 
             user = db.session.get(BotUser, chat_id)
             if user:
-                new_req = PartnerRequest(text=txt)
-                db.session.add(new_req)
+                # Default behavior: if user just types text, add it to requests
+                db.session.add(PartnerRequest(text=txt))
                 db.session.commit()
-                request_bot.reply_to(message, "✅ Added to the list!")
+                request_bot.reply_to(message, "✅ Added to Requests.", reply_markup=get_main_menu(user.role))
             else:
-                request_bot.reply_to(message, "⛔️ Unknown user. Please send your password.")
+                request_bot.reply_to(message, "⛔️ Access denied. Send password.")
 
 
 def run_request_bot_thread():
