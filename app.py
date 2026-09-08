@@ -1,4 +1,5 @@
 import os
+import time
 import datetime
 import requests
 import hashlib
@@ -1808,8 +1809,11 @@ if pebble_bot:
             pebble_user_editing_day[chat_id] = day_key
             text = generate_pebble_dashboard_text(pebble_user_drafts[chat_id], editing_day=day_key)
             kb = generate_pebble_keyboard()
-            pebble_bot.edit_message_text(text, chat_id, call.message.message_id, reply_markup=kb, parse_mode="HTML")
-            
+            try:
+                pebble_bot.edit_message_text(text, chat_id, call.message.message_id, reply_markup=kb, parse_mode="HTML")
+            except telebot.apihelper.ApiTelegramException as e:
+                if "message is not modified" not in str(e):
+                    print(f"Telegram Edit Error: {e}")            
         elif data == "pbl_publish":
             pebble_bot.edit_message_text("⏳ <i>Publishing to GitHub Gist...</i>", chat_id, call.message.message_id, parse_mode="HTML")
             try:
@@ -1848,20 +1852,24 @@ if pebble_bot:
 
 def run_request_bot_thread():
     if request_bot:
-        try:
-            print("Request Bot polling started...")
-            request_bot.polling(none_stop=True)
-        except Exception as e:
-            print(f"Request Bot crash: {e}")
+        while True:
+            try:
+                print("Request Bot polling started...")
+                request_bot.polling(none_stop=True, timeout=60)
+            except Exception as e:
+                print(f"Request Bot crash: {e}")
+                time.sleep(3)
 
 def run_pebble_bot_thread():
     if pebble_bot:
-        try:
-            print("Pebble Bot polling started...")
-            pebble_bot.polling(none_stop=True)
-        except Exception as e:
-            print(f"Pebble Bot crash: {e}")
-
+        while True:
+            try:
+                print("Pebble Bot polling started...")
+                pebble_bot.polling(none_stop=True, timeout=60)
+            except Exception as e:
+                print(f"Pebble Bot crash: {e}")
+                time.sleep(3)
+                
 if not any(t.name == "RequestBotThread" for t in threading.enumerate()):
     t2 = threading.Thread(target=run_request_bot_thread, name="RequestBotThread")
     t2.daemon = True
