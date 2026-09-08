@@ -64,6 +64,15 @@ request_bot = None
 if REQUEST_BOT_TOKEN:
     request_bot = telebot.TeleBot(REQUEST_BOT_TOKEN)
 
+PEBBLE_BOT_TOKEN = os.environ.get("PEBBLE_BOT_TOKEN", "")
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+PEBBLE_GIST_ID = "b8fc1392e021be300a691cb7e02d9998"
+PEBBLE_ALLOWED_USERS = ['studyaddress', 'kraynikov']
+
+pebble_bot = None
+if PEBBLE_BOT_TOKEN:
+    pebble_bot = telebot.TeleBot(PEBBLE_BOT_TOKEN)
+# ------------------
 
 # --- MODELS ---
 
@@ -1022,16 +1031,6 @@ if request_bot:
             else:
                 request_bot.reply_to(message, "⛔️ Access denied. Send password.")
 
-
-def run_request_bot_thread():
-    if request_bot:
-        try:
-            print("Request Bot polling started...")
-            request_bot.polling(none_stop=True)
-        except Exception as e:
-            print(f"Request Bot crash: {e}")
-
-
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -1708,6 +1707,144 @@ with app.app_context():
             minute=0,
         )
 
+# ==========================================
+# --- PEBBLE BOT LOGIC ---
+# ==========================================
+DAY_NAMES = {
+    "1": "Monday", "2": "Tuesday", "3": "Wednesday",
+    "4": "Thursday", "5": "Friday", "6": "Saturday", "0": "Sunday"
+}
+
+pebble_user_drafts = {}
+pebble_user_editing_day = {}
+pebble_dashboard_messages = {}
+
+def get_pebble_gist():
+    url = f"https://api.github.com/gists/{PEBBLE_GIST_ID}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+    try:
+        response = requests.get(url, headers=headers)
+        if response.ok:
+            content = response.json().get('files', {}).get('weekly_tasks.json', {}).get('content', '{}')
+            return json.loads(content)
+    except Exception as e:
+        print(f"Gist fetch error: {e}")
+    return {key: "" for key in DAY_NAMES.keys()}
+
+def update_pebble_gist(tasks_obj):
+    url = f"https://api.github.com/gists/{PEBBLE_GIST_ID}"
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "User-Agent": "Pebble-Task-Bot",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    payload = {
+        "files": {
+            "weekly_tasks.json": {
+                "content": json.dumps(tasks_obj, ensure_ascii=False, indent=2)
+            }
+        }
+    }
+    response = requests.patch(url, headers=headers, json=payload)
+    if not response.ok:
+        raise Exception(f"API Error {response.status_code}")
+
+def generate_pebble_dashboard_text(draft, editing_day=None):
+    lines = ["🗓 <b>Weekly Schedule Dashboard</b>\n"]
+    for key, name in DAY_NAMES.items():
+        task = draft.get(key, "").strip()
+        if editing_day == key:
+            lines.append(f"👉 <b>{name}:</b> <i>[ Waiting for your text... ]</i>\n")
+        else:
+            if task:
+                lines.append(f"<b>{name}:</b>\n{task}\n")
+            else:
+                lines.append(f"<b>{name}:</b> <i>Empty</i>\n")
+    if editing_day:
+        lines.append(f"\n⌨️ <i>Type your tasks for {DAY_NAMES[editing_day]} and hit Send...</i>")
+    else:
+        lines.append("👆 <i>Select a day to edit, or hit Publish.</i>")
+    return "\n".join(lines)
+
+def generate_pebble_keyboard():
+    markup = InlineKeyboardMarkup(row_width=3)
+    short_names = {"1": "Mon", "2": "Tue", "3": "Wed", "4": "Thu", "5": "Fri", "6": "Sat", "0": "Sun"}
+    buttons = [InlineKeyboardButton(name, callback_data=f"pbl_edit_{key}") for key, name in short_names.items()]
+    markup.add(*buttons)
+    markup.add(InlineKeyboardButton("🚀 Publish to Watch", callback_data="pbl_publish"))
+    return markup
+
+if pebble_bot:
+    @pebble_bot.message_handler(commands=['start'])
+    def pebble_start(message):
+        if message.from_user.username not in PEBBLE_ALLOWED_USERS:
+            return
+        chat_id = message.chat.id
+        init_msg = pebble_bot.send_message(chat_id, "🔄 <i>Initializing dashboard...</i>", parse_mode="HTML")
+        
+        current_tasks = get_pebble_gist()
+        pebble_user_drafts[chat_id] = current_tasks
+        pebble_user_editing_day.pop(chat_id, None)
+        
+        text = generate_pebble_dashboard_text(current_tasks)
+        kb = generate_pebble_keyboard()
+        
+        dash_msg = pebble_bot.send_message(chat_id, text, reply_markup=kb, parse_mode="HTML")
+        pebble_dashboard_messages[chat_id] = dash_msg.message_id
+        pebble_bot.delete_message(chat_id, init_msg.message_id)
+
+    @pebble_bot.callback_query_handler(func=lambda call: call.data.startswith('pbl_'))
+    def pebble_callback(call):
+        if call.from_user.username not in PEBBLE_ALLOWED_USERS:
+            return
+        chat_id = call.message.chat.id
+        data = call.data
+        
+        if chat_id not in pebble_user_drafts:
+            pebble_user_drafts[chat_id] = get_pebble_gist()
+            
+        if data.startswith("pbl_edit_"):
+            day_key = data.split("_")[2]
+            pebble_user_editing_day[chat_id] = day_key
+            text = generate_pebble_dashboard_text(pebble_user_drafts[chat_id], editing_day=day_key)
+            kb = generate_pebble_keyboard()
+            pebble_bot.edit_message_text(text, chat_id, call.message.message_id, reply_markup=kb, parse_mode="HTML")
+            
+        elif data == "pbl_publish":
+            pebble_bot.edit_message_text("⏳ <i>Publishing to GitHub Gist...</i>", chat_id, call.message.message_id, parse_mode="HTML")
+            try:
+                update_pebble_gist(pebble_user_drafts[chat_id])
+                pebble_bot.edit_message_text("✅ <b>Published successfully!</b>\n\nYour watch will sync shortly. Send /start to edit again.", chat_id, call.message.message_id, parse_mode="HTML")
+                pebble_dashboard_messages.pop(chat_id, None)
+            except Exception as e:
+                pebble_bot.edit_message_text(f"❌ <b>Error:</b> {e}\n\nSend /start to try again.", chat_id, call.message.message_id, parse_mode="HTML")
+        
+        pebble_bot.answer_callback_query(call.id)
+
+    @pebble_bot.message_handler(func=lambda message: True)
+    def pebble_text(message):
+        if message.from_user.username not in PEBBLE_ALLOWED_USERS:
+            return
+        chat_id = message.chat.id
+        
+        try:
+            pebble_bot.delete_message(chat_id, message.message_id)
+        except Exception:
+            pass 
+            
+        if chat_id in pebble_user_editing_day and chat_id in pebble_dashboard_messages:
+            day_key = pebble_user_editing_day[chat_id]
+            pebble_user_drafts[chat_id][day_key] = message.text
+            pebble_user_editing_day.pop(chat_id, None)
+            
+            text = generate_pebble_dashboard_text(pebble_user_drafts[chat_id])
+            kb = generate_pebble_keyboard()
+            
+            try:
+                pebble_bot.edit_message_text(text, chat_id, pebble_dashboard_messages[chat_id], reply_markup=kb, parse_mode="HTML")
+            except Exception as e:
+                print(f"Failed to edit dashboard: {e}")
+# ==========================================
 
 def run_request_bot_thread():
     if request_bot:
@@ -1717,12 +1854,23 @@ def run_request_bot_thread():
         except Exception as e:
             print(f"Request Bot crash: {e}")
 
+def run_pebble_bot_thread():
+    if pebble_bot:
+        try:
+            print("Pebble Bot polling started...")
+            pebble_bot.polling(none_stop=True)
+        except Exception as e:
+            print(f"Pebble Bot crash: {e}")
 
 if not any(t.name == "RequestBotThread" for t in threading.enumerate()):
     t2 = threading.Thread(target=run_request_bot_thread, name="RequestBotThread")
     t2.daemon = True
     t2.start()
 
+if not any(t.name == "PebbleBotThread" for t in threading.enumerate()):
+    t3 = threading.Thread(target=run_pebble_bot_thread, name="PebbleBotThread")
+    t3.daemon = True
+    t3.start()
 
 @app.route("/api/calendar/<cal_type>/<int:year>/<int:month>", methods=["GET"])
 @login_required
